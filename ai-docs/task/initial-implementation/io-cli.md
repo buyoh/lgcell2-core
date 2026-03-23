@@ -95,19 +95,26 @@ pub struct WireJson {
 
 ### CLI インターフェース
 
+エントリポイントは `src/bin/lgcell2/main.rs` に配置する。`src/main.rs` は削除する。
+
+```rust
+// src/bin/lgcell2/main.rs
+use clap::Parser;
+
+/// LGCELL2 回路シミュレータ
+#[derive(Parser)]
+#[command(name = "lgcell2")]
+struct Cli {
+    /// 回路定義 JSON ファイル。省略時は標準入力から読み込み。
+    file: Option<PathBuf>,
+
+    /// シミュレーションする tick 数
+    #[arg(short, long, default_value_t = 100)]
+    ticks: u64,
+}
 ```
-USAGE:
-    lgcell2-core [OPTIONS] [FILE]
 
-ARGS:
-    [FILE]    回路定義 JSON ファイル。省略時は標準入力から読み込み。
-
-OPTIONS:
-    -t, --ticks <N>    シミュレーションする tick 数 (デフォルト: 100)
-    -h, --help         ヘルプを表示
-```
-
-- 外部クレートは最小限にする。引数パースは手動実装（clap 等は使わない）。
+- 引数パースには `clap` (derive マクロ) を使用する。
 - 入力: ファイルパスまたは stdin から JSON を読み込む。
 - 出力: stdout に結果 JSON を出力する。
 - エラー: stderr にエラーメッセージを出力し、非ゼロ終了コードで終了する。
@@ -116,6 +123,7 @@ OPTIONS:
 
 ```toml
 [dependencies]
+clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 ```
