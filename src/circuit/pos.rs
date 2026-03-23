@@ -13,5 +13,5 @@ impl Pos {
 }
 
 #[cfg(test)]
-#[path = "cell_tests.rs"]
-mod cell_tests;
+#[path = "pos_tests.rs"]
+mod pos_tests;

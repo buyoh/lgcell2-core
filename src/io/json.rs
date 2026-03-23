@@ -48,12 +48,6 @@ impl TryFrom<CircuitJson> for Circuit {
                 _ => return Err(format!("wire kind must be positive or negative: {}", wire.kind)),
             };
 
-            if src == dst {
-                return Err(format!(
-                    "self-loop wire is not allowed: src=({}, {}), dst=({}, {})",
-                    src.x, src.y, dst.x, dst.y
-                ));
-            }
 
             cells.insert(src);
             cells.insert(dst);
