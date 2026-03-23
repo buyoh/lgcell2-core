@@ -41,13 +41,27 @@ src/
   circuit/
     mod.rs
     cell.rs            # Pos
+    cell_tests.rs      # Pos の単体テスト
     wire.rs            # WireKind, Wire
+    wire_tests.rs      # Wire の単体テスト
     circuit.rs         # Circuit (回路定義, 不変)
+    circuit_tests.rs   # Circuit の単体テスト
   simulation/
     mod.rs
     state.rs           # SimState (各セルの現在値)
+    state_tests.rs     # SimState の単体テスト
     engine.rs          # Simulator, StepResult
+    engine_tests.rs    # Simulator の単体テスト
   io/
     mod.rs
     json.rs            # JSON デシリアライズ / シリアライズ
+    json_tests.rs      # JSON I/O の単体テスト
+tests/
+  half_adder.rs        # 半加算器等の統合テスト
 ```
+
+### テスト規約
+
+- **単体テスト**: 各モジュールと同階層に `foo_tests.rs` として配置。`#[cfg(test)] mod tests` は使わない。
+  - `foo.rs` 内に `#[cfg(test)] mod foo_tests;` で参照するか、`mod.rs` で `#[cfg(test)] mod foo_tests;` を宣言する。
+- **統合テスト**: `tests/` ディレクトリに配置。回路単位のエンドツーエンドテスト。
