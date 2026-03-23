@@ -13,13 +13,10 @@
 
 ### 入力 JSON フォーマット
 
+全セルの初期値は 0 (false) 固定。セルはワイヤの端点 (src, dst) から自動的に推論されるため、`cells` フィールドは不要。
+
 ```json
 {
-  "cells": [
-    { "x": 0, "y": 0, "initial": 0 },
-    { "x": 1, "y": 0, "initial": 1 },
-    { "x": 2, "y": 0, "initial": 0 }
-  ],
   "wires": [
     { "src": [0, 0], "dst": [1, 0], "kind": "positive" },
     { "src": [1, 0], "dst": [2, 0], "kind": "negative" }
@@ -27,7 +24,6 @@
 }
 ```
 
-- `cells[].initial`: `0` または `1`。
 - `wires[].src`, `wires[].dst`: `[x, y]` の 2 要素配列。
 - `wires[].kind`: `"positive"` または `"negative"`。
 
@@ -35,9 +31,8 @@
 
 JSON パース後、以下を検証する:
 
-1. ワイヤの `src`, `dst` が `cells` に存在するセルを参照していること。
-2. `initial` が 0 または 1 であること。
-3. 自己ループ（src == dst）がないこと。
+1. `kind` が `"positive"` または `"negative"` であること。
+2. 自己ループ（src == dst）がないこと。
 
 エラーは `Result` で返し、具体的なエラーメッセージを含める。
 
@@ -50,15 +45,7 @@ JSON 用の構造体とドメインモデルは分離する。
 
 #[derive(Deserialize)]
 pub struct CircuitJson {
-    pub cells: Vec<CellJson>,
     pub wires: Vec<WireJson>,
-}
-
-#[derive(Deserialize)]
-pub struct CellJson {
-    pub x: i32,
-    pub y: i32,
-    pub initial: u8,
 }
 
 #[derive(Deserialize)]
@@ -69,7 +56,7 @@ pub struct WireJson {
 }
 ```
 
-`CircuitJson` → `Circuit` への変換メソッド (`TryFrom` or 専用関数) でバリデーションを行う。
+`CircuitJson` → `Circuit` への変換 (`TryFrom`) でバリデーションを行い、セルはワイヤの端点から自動推論する。
 
 ### 出力フォーマット
 

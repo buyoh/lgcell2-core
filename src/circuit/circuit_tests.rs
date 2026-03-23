@@ -1,12 +1,12 @@
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use crate::circuit::{Circuit, Pos, Wire, WireKind};
 
-fn sample_cells() -> BTreeMap<Pos, bool> {
-    BTreeMap::from([
-        (Pos::new(0, 0), false),
-        (Pos::new(1, 0), true),
-        (Pos::new(2, 0), false),
+fn sample_cells() -> BTreeSet<Pos> {
+    BTreeSet::from([
+        Pos::new(0, 0),
+        Pos::new(1, 0),
+        Pos::new(2, 0),
     ])
 }
 
@@ -26,10 +26,7 @@ fn circuit_builds_incoming_index() {
 
 #[test]
 fn circuit_keeps_sorted_cells() {
-    let mut cells = BTreeMap::new();
-    cells.insert(Pos::new(1, 1), false);
-    cells.insert(Pos::new(0, 3), false);
-    cells.insert(Pos::new(1, -1), false);
+    let cells = BTreeSet::from([Pos::new(1, 1), Pos::new(0, 3), Pos::new(1, -1)]);
 
     let circuit = Circuit::new(cells, Vec::new()).expect("circuit must be valid");
 

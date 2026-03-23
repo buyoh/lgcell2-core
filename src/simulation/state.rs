@@ -9,12 +9,12 @@ pub struct SimState {
 }
 
 impl SimState {
-    /// 回路の初期値から状態を作成する。
+    /// 回路のセル一覧から状態を作成する。全セルの初期値は false (0)。
     pub fn from_circuit(circuit: &Circuit) -> Self {
         let values = circuit
             .cells()
             .iter()
-            .map(|(pos, value)| (*pos, *value))
+            .map(|pos| (*pos, false))
             .collect::<HashMap<_, _>>();
 
         Self { values }

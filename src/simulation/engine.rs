@@ -10,6 +10,21 @@ pub enum StepResult {
     TickComplete,
 }
 
+/// `Simulator::state_mut()` 経由で prev_state と curr_state を同時に更新するためのヘルパー。
+pub struct StateMut<'a> {
+    prev_state: &'a mut SimState,
+    curr_state: &'a mut SimState,
+}
+
+impl StateMut<'_> {
+    /// 指定座標の値を prev_state と curr_state の両方で更新する。
+    pub fn set(&mut self, pos: Pos, value: bool) -> Result<(), String> {
+        self.prev_state.set(pos, value)?;
+        self.curr_state.set(pos, value)?;
+        Ok(())
+    }
+}
+
 /// 中断可能なシミュレーションエンジン。
 #[derive(Debug, Clone)]
 pub struct Simulator {
@@ -103,6 +118,15 @@ impl Simulator {
     /// 現在の状態を取得する。
     pub fn state(&self) -> &SimState {
         &self.prev_state
+    }
+
+    /// 現在の状態を可変参照で取得する。tick 実行前に入力セルの値を設定するために使用する。
+    /// prev_state と curr_state の両方を更新する。
+    pub fn state_mut(&mut self) -> StateMut<'_> {
+        StateMut {
+            prev_state: &mut self.prev_state,
+            curr_state: &mut self.curr_state,
+        }
     }
 
     /// 現在の tick 番号を取得する。

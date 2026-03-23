@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
@@ -8,16 +8,7 @@ use crate::simulation::Simulator;
 /// 回路 JSON 全体を表す入力モデル。
 #[derive(Debug, Deserialize)]
 pub struct CircuitJson {
-    pub cells: Vec<CellJson>,
     pub wires: Vec<WireJson>,
-}
-
-/// セル入力を表す JSON モデル。
-#[derive(Debug, Deserialize)]
-pub struct CellJson {
-    pub x: i32,
-    pub y: i32,
-    pub initial: u8,
 }
 
 /// ワイヤ入力を表す JSON モデル。
@@ -45,26 +36,9 @@ impl TryFrom<CircuitJson> for Circuit {
     type Error = String;
 
     fn try_from(value: CircuitJson) -> Result<Self, Self::Error> {
-        let mut cells = BTreeMap::new();
-        for cell in value.cells {
-            let initial = match cell.initial {
-                0 => false,
-                1 => true,
-                _ => {
-                    return Err(format!(
-                        "cell initial must be 0 or 1: ({}, {}) = {}",
-                        cell.x, cell.y, cell.initial
-                    ));
-                }
-            };
-
-            let pos = Pos::new(cell.x, cell.y);
-            if cells.insert(pos, initial).is_some() {
-                return Err(format!("duplicated cell position: ({}, {})", cell.x, cell.y));
-            }
-        }
-
+        let mut cells = BTreeSet::new();
         let mut wires = Vec::with_capacity(value.wires.len());
+
         for wire in value.wires {
             let src = Pos::new(wire.src[0], wire.src[1]);
             let dst = Pos::new(wire.dst[0], wire.dst[1]);
@@ -81,6 +55,8 @@ impl TryFrom<CircuitJson> for Circuit {
                 ));
             }
 
+            cells.insert(src);
+            cells.insert(dst);
             wires.push(Wire::new(src, dst, kind));
         }
 

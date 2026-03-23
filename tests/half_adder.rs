@@ -1,18 +1,38 @@
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use lgcell2_core::circuit::{Circuit, Pos, Wire, WireKind};
 use lgcell2_core::simulation::Simulator;
 
-fn build_half_adder(a: bool, b: bool) -> Circuit {
-    let cells = BTreeMap::from([
-        (Pos::new(0, 0), a),
-        (Pos::new(0, 1), b),
-        (Pos::new(1, 0), false), // or1
-        (Pos::new(1, 1), false), // nand1
-        (Pos::new(2, 0), false), // nand_xor
-        (Pos::new(3, 0), false), // sum
-        (Pos::new(2, 1), false), // nand_ab
-        (Pos::new(3, 1), false), // carry
+fn run_half_adder(a: bool, b: bool) -> (bool, bool) {
+    let mut sim = Simulator::new(build_half_adder());
+
+    // 初期値は全て 0 なので、入力セルの値を手動で設定してから tick する
+    sim.state_mut().set(Pos::new(0, 0), a).unwrap();
+    sim.state_mut().set(Pos::new(0, 1), b).unwrap();
+    sim.tick();
+
+    let sum = sim
+        .state()
+        .get(Pos::new(3, 0))
+        .expect("sum cell must exist");
+    let carry = sim
+        .state()
+        .get(Pos::new(3, 1))
+        .expect("carry cell must exist");
+
+    (sum, carry)
+}
+
+fn build_half_adder() -> Circuit {
+    let cells = BTreeSet::from([
+        Pos::new(0, 0), // a
+        Pos::new(0, 1), // b
+        Pos::new(1, 0), // or1
+        Pos::new(1, 1), // nand1
+        Pos::new(2, 0), // nand_xor
+        Pos::new(3, 0), // sum
+        Pos::new(2, 1), // nand_ab
+        Pos::new(3, 1), // carry
     ]);
 
     let wires = vec![
@@ -41,10 +61,21 @@ fn half_adder_truth_table() {
     ];
 
     for (a, b, expected_sum, expected_carry) in cases {
-        let mut sim = Simulator::new(build_half_adder(a, b));
-        sim.tick();
+        let (sum, carry) = run_half_adder(a, b);
+        assert_eq!(sum, expected_sum);
+        assert_eq!(carry, expected_carry);
+    }
+}
 
-        assert_eq!(sim.state().get(Pos::new(3, 0)), Some(expected_sum));
-        assert_eq!(sim.state().get(Pos::new(3, 1)), Some(expected_carry));
+#[test]
+fn half_adder_is_stateless_under_alternating_inputs() {
+    for _ in 0..32 {
+        let (sum_11, carry_11) = run_half_adder(true, true);
+        assert_eq!(sum_11, false);
+        assert_eq!(carry_11, true);
+
+        let (sum_00, carry_00) = run_half_adder(false, false);
+        assert_eq!(sum_00, false);
+        assert_eq!(carry_00, false);
     }
 }

@@ -7,12 +7,8 @@ use crate::simulation::Simulator;
 fn parse_valid_json_to_circuit() {
     let input = r#"
     {
-      "cells": [
-        { "x": 0, "y": 0, "initial": 1 },
-        { "x": 1, "y": 0, "initial": 0 }
-      ],
       "wires": [
-        { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
+        { "src": [0, 0], "dst": [1, 0], "kind": "negative" }
       ]
     }
     "#;
@@ -21,32 +17,14 @@ fn parse_valid_json_to_circuit() {
     let mut sim = Simulator::new(circuit);
     sim.tick();
 
+    // src=0,0 は初期値 false → Negative で反転 → true
     assert_eq!(sim.state().get(crate::circuit::Pos::new(1, 0)), Some(true));
-}
-
-#[test]
-fn parse_rejects_unknown_wire_reference() {
-    let input = r#"
-    {
-      "cells": [{ "x": 0, "y": 0, "initial": 1 }],
-      "wires": [
-        { "src": [0, 0], "dst": [2, 0], "kind": "positive" }
-      ]
-    }
-    "#;
-
-    let err = parse_circuit_json(input).expect_err("must reject unknown destination");
-    assert!(err.contains("wire dst does not exist"));
 }
 
 #[test]
 fn parse_rejects_invalid_kind() {
     let input = r#"
     {
-      "cells": [
-        { "x": 0, "y": 0, "initial": 1 },
-        { "x": 1, "y": 0, "initial": 0 }
-      ],
       "wires": [
         { "src": [0, 0], "dst": [1, 0], "kind": "unknown" }
       ]
@@ -61,7 +39,6 @@ fn parse_rejects_invalid_kind() {
 fn parse_rejects_self_loop() {
     let input = r#"
     {
-      "cells": [{ "x": 0, "y": 0, "initial": 1 }],
       "wires": [
         { "src": [0, 0], "dst": [0, 0], "kind": "positive" }
       ]
@@ -76,12 +53,8 @@ fn parse_rejects_self_loop() {
 fn output_json_has_expected_shape() {
     let input = r#"
     {
-      "cells": [
-        { "x": 0, "y": 0, "initial": 1 },
-        { "x": 1, "y": 0, "initial": 0 }
-      ],
       "wires": [
-        { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
+        { "src": [0, 0], "dst": [1, 0], "kind": "negative" }
       ]
     }
     "#;
@@ -92,7 +65,7 @@ fn output_json_has_expected_shape() {
 
     assert!(text.contains("\"ticks\""));
     assert!(text.contains("\"tick\": 1"));
-    assert!(text.contains("\"0,0\": 1"));
+    assert!(text.contains("\"0,0\": 0"));
     assert!(text.contains("\"1,0\": 1"));
 }
 
@@ -100,12 +73,28 @@ fn output_json_has_expected_shape() {
 fn circuit_json_deserializes() {
     let input = r#"
     {
-      "cells": [{ "x": 0, "y": 0, "initial": 0 }],
       "wires": []
     }
     "#;
 
     let parsed: CircuitJson = serde_json::from_str(input).expect("must deserialize");
-    assert_eq!(parsed.cells.len(), 1);
     assert!(parsed.wires.is_empty());
+}
+
+#[test]
+fn cells_are_inferred_from_wire_endpoints() {
+    let input = r#"
+    {
+      "wires": [
+        { "src": [0, 0], "dst": [1, 0], "kind": "positive" },
+        { "src": [1, 0], "dst": [2, 0], "kind": "negative" }
+      ]
+    }
+    "#;
+
+    let circuit = parse_circuit_json(input).expect("json must parse");
+    assert_eq!(circuit.cells().len(), 3);
+    assert!(circuit.cells().contains(&crate::circuit::Pos::new(0, 0)));
+    assert!(circuit.cells().contains(&crate::circuit::Pos::new(1, 0)));
+    assert!(circuit.cells().contains(&crate::circuit::Pos::new(2, 0)));
 }

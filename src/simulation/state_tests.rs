@@ -1,10 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use crate::circuit::{Circuit, Pos};
 use crate::simulation::SimState;
 
 fn build_circuit() -> Circuit {
-    let cells = BTreeMap::from([(Pos::new(0, 0), false), (Pos::new(1, 0), true)]);
+    let cells = BTreeSet::from([Pos::new(0, 0), Pos::new(1, 0)]);
     Circuit::new(cells, Vec::new()).expect("valid circuit")
 }
 
@@ -14,7 +14,7 @@ fn state_is_initialized_from_circuit_cells() {
     let state = SimState::from_circuit(&circuit);
 
     assert_eq!(state.get(Pos::new(0, 0)), Some(false));
-    assert_eq!(state.get(Pos::new(1, 0)), Some(true));
+    assert_eq!(state.get(Pos::new(1, 0)), Some(false));
 }
 
 #[test]

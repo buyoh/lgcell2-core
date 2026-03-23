@@ -1,12 +1,13 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeSet, HashMap};
 
 use crate::circuit::{Pos, Wire};
 
 /// 回路の構造定義。構築後は不変。
+/// 全セルの初期値は 0 (false) 固定。
 #[derive(Debug, Clone)]
 pub struct Circuit {
-    /// 全セルの初期値。BTreeMap により (x, y) 順でソート済み。
-    cells: BTreeMap<Pos, bool>,
+    /// 全セルの座標。BTreeSet により (x, y) 順でソート済み。
+    cells: BTreeSet<Pos>,
     /// 全ワイヤ。
     wires: Vec<Wire>,
     /// dst でグループ化したワイヤインデックス（事前計算）。
@@ -17,7 +18,7 @@ pub struct Circuit {
 
 impl Circuit {
     /// セル定義とワイヤ定義から回路を構築する。
-    pub fn new(cells: BTreeMap<Pos, bool>, wires: Vec<Wire>) -> Result<Self, String> {
+    pub fn new(cells: BTreeSet<Pos>, wires: Vec<Wire>) -> Result<Self, String> {
         for wire in &wires {
             if wire.src == wire.dst {
                 return Err(format!(
@@ -26,14 +27,14 @@ impl Circuit {
                 ));
             }
 
-            if !cells.contains_key(&wire.src) {
+            if !cells.contains(&wire.src) {
                 return Err(format!(
                     "wire src does not exist in cells: ({}, {})",
                     wire.src.x, wire.src.y
                 ));
             }
 
-            if !cells.contains_key(&wire.dst) {
+            if !cells.contains(&wire.dst) {
                 return Err(format!(
                     "wire dst does not exist in cells: ({}, {})",
                     wire.dst.x, wire.dst.y
@@ -46,7 +47,7 @@ impl Circuit {
             incoming.entry(wire.dst).or_default().push(idx);
         }
 
-        let sorted_cells = cells.keys().copied().collect::<Vec<_>>();
+        let sorted_cells = cells.iter().copied().collect::<Vec<_>>();
 
         Ok(Self {
             cells,
@@ -56,8 +57,8 @@ impl Circuit {
         })
     }
 
-    /// 全セルの初期値を返す。
-    pub fn cells(&self) -> &BTreeMap<Pos, bool> {
+    /// 全セルの座標一覧を返す。
+    pub fn cells(&self) -> &BTreeSet<Pos> {
         &self.cells
     }
 
@@ -79,10 +80,6 @@ impl Circuit {
             .unwrap_or(&[])
     }
 
-    /// 指定セルの初期値を返す。
-    pub fn initial_value(&self, pos: Pos) -> Option<bool> {
-        self.cells.get(&pos).copied()
-    }
 }
 
 #[cfg(test)]

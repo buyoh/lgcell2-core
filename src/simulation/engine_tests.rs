@@ -1,19 +1,19 @@
-use std::collections::BTreeMap;
+use std::collections::BTreeSet;
 
 use crate::circuit::{Circuit, Pos, Wire, WireKind};
 use crate::simulation::{Simulator, StepResult};
 
-fn make_circuit(cells: &[(Pos, bool)], wires: Vec<Wire>) -> Circuit {
-    Circuit::new(BTreeMap::from_iter(cells.iter().copied()), wires).expect("valid circuit")
+fn make_circuit(cells: &[Pos], wires: Vec<Wire>) -> Circuit {
+    Circuit::new(BTreeSet::from_iter(cells.iter().copied()), wires).expect("valid circuit")
 }
 
 #[test]
 fn positive_chain_propagates_within_one_tick() {
     let circuit = make_circuit(
         &[
-            (Pos::new(0, 0), true),
-            (Pos::new(1, 0), false),
-            (Pos::new(2, 0), false),
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            Pos::new(2, 0),
         ],
         vec![
             Wire::new(Pos::new(0, 0), Pos::new(1, 0), WireKind::Positive),
@@ -24,14 +24,15 @@ fn positive_chain_propagates_within_one_tick() {
     let mut sim = Simulator::new(circuit);
     sim.tick();
 
-    assert_eq!(sim.state().get(Pos::new(1, 0)), Some(true));
-    assert_eq!(sim.state().get(Pos::new(2, 0)), Some(true));
+    // 初期値が全て 0 のため、Positive 伝搬しても全て false のまま
+    assert_eq!(sim.state().get(Pos::new(1, 0)), Some(false));
+    assert_eq!(sim.state().get(Pos::new(2, 0)), Some(false));
 }
 
 #[test]
 fn backward_wire_is_delayed_by_one_tick() {
     let circuit = make_circuit(
-        &[(Pos::new(0, 0), false), (Pos::new(1, 0), true)],
+        &[Pos::new(0, 0), Pos::new(1, 0)],
         vec![Wire::new(
             Pos::new(1, 0),
             Pos::new(0, 0),
@@ -41,16 +42,17 @@ fn backward_wire_is_delayed_by_one_tick() {
 
     let mut sim = Simulator::new(circuit);
     sim.tick();
-    assert_eq!(sim.state().get(Pos::new(0, 0)), Some(true));
+    // 初期値が全て 0 のため、Positive 伝搬しても false のまま
+    assert_eq!(sim.state().get(Pos::new(0, 0)), Some(false));
 }
 
 #[test]
 fn nand_is_constructed_by_two_negative_wires() {
     let circuit = make_circuit(
         &[
-            (Pos::new(0, 0), true),
-            (Pos::new(1, 0), true),
-            (Pos::new(2, 0), false),
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            Pos::new(2, 0),
         ],
         vec![
             Wire::new(Pos::new(0, 0), Pos::new(2, 0), WireKind::Negative),
@@ -60,16 +62,17 @@ fn nand_is_constructed_by_two_negative_wires() {
 
     let mut sim = Simulator::new(circuit);
     sim.tick();
-    assert_eq!(sim.state().get(Pos::new(2, 0)), Some(false));
+    // 入力が両方 false → Negative で反転 → 両方 true → OR = true
+    assert_eq!(sim.state().get(Pos::new(2, 0)), Some(true));
 }
 
 #[test]
 fn step_can_pause_and_resume_without_behavior_change() {
     let circuit = make_circuit(
         &[
-            (Pos::new(0, 0), true),
-            (Pos::new(1, 0), false),
-            (Pos::new(2, 0), false),
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            Pos::new(2, 0),
         ],
         vec![
             Wire::new(Pos::new(0, 0), Pos::new(1, 0), WireKind::Positive),
