@@ -25,21 +25,11 @@ pub struct Pos {
 - `Ord` の導出順は **(x, y) の辞書順** となる。これはシミュレーションの伝搬順序の定義と一致する。
 - Rust の derive `Ord` はフィールド宣言順で比較するため、`x` を先に宣言する。
 
-### CellValue — セルの値
+### セルの値
 
-```rust
-/// セルが保持する値。
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum CellValue {
-    /// 通常モード: 0 または 1。
-    Binary(bool),
-    /// 微分可能モード: 0.0〜1.0 の実数。
-    Continuous(f64),
-}
-```
+セルの値は `bool` で表現する（`false` = 0, `true` = 1）。
 
-- 通常モードでは `Binary(false)` = 0, `Binary(true)` = 1。
-- `Continuous` は将来の微分可能モード用。初期実装では `Binary` のみ使用する。
+> **TODO（微分可能モード）:** 将来的に 0.0〜1.0 の実数状態を持つ微分可能モードを導入予定。高難易度のため現段階では設計・実装しない。導入時に `bool` を専用の型 (`CellValue` enum 等) へ置き換える。
 
 ### WireKind — ワイヤの極性
 
@@ -72,7 +62,7 @@ pub struct Wire {
 /// 回路の構造定義。構築後は不変。
 pub struct Circuit {
     /// 全セルの初期値。BTreeMap により (x, y) 順でソート済み。
-    cells: BTreeMap<Pos, CellValue>,
+    cells: BTreeMap<Pos, bool>,
     /// 全ワイヤ。
     wires: Vec<Wire>,
     /// dst でグループ化したワイヤインデックス（事前計算）。
@@ -118,4 +108,4 @@ Negative ワイヤ 2 本で NAND が実現でき、NAND は万能ゲートであ
 
 - `Pos` の `Ord` が (x, y) 辞書順であることを確認
 - `Circuit` 構築時に `incoming` が正しく計算されることを確認
-- `CellValue` の各バリアントの基本操作を確認
+- セル値 (`bool`) の伝搬・反転操作を確認
