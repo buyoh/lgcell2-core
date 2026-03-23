@@ -10,6 +10,13 @@ pub enum StepResult {
     TickComplete,
 }
 
+/// 単一 tick 実行後の状態スナップショット。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TickSnapshot {
+    pub tick: u64,
+    pub cells: Vec<(Pos, bool)>,
+}
+
 /// `Simulator::state_mut()` 経由で prev_state と curr_state を同時に更新するためのヘルパー。
 pub struct StateMut<'a> {
     prev_state: &'a mut SimState,
@@ -113,6 +120,29 @@ impl Simulator {
             self.tick();
         }
         &self.prev_state
+    }
+
+    /// 指定 tick 数だけ進め、各 tick の状態をセル順で収集して返す。
+    pub fn run_with_snapshots(&mut self, ticks: u64) -> Vec<TickSnapshot> {
+        let mut snapshots = Vec::with_capacity(ticks as usize);
+        for _ in 0..ticks {
+            self.tick();
+
+            let mut cells = Vec::with_capacity(self.circuit.sorted_cells().len());
+            for pos in self.circuit.sorted_cells() {
+                let value = self
+                    .prev_state
+                    .get(*pos)
+                    .expect("position from sorted cells must exist");
+                cells.push((*pos, value));
+            }
+
+            snapshots.push(TickSnapshot {
+                tick: self.tick,
+                cells,
+            });
+        }
+        snapshots
     }
 
     /// 現在の状態を取得する。

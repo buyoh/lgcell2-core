@@ -67,25 +67,17 @@ pub fn parse_circuit_json(input: &str) -> Result<Circuit, String> {
 /// 回路を指定 tick だけ実行した結果を JSON モデルとして返す。
 pub fn simulate_to_output_json(circuit: Circuit, ticks: u64) -> SimulationOutputJson {
     let mut simulator = Simulator::new(circuit);
-    let mut results = Vec::with_capacity(ticks as usize);
+    let snapshots = simulator.run_with_snapshots(ticks);
+    let mut results = Vec::with_capacity(snapshots.len());
 
-    for tick_index in 1..=ticks {
-        simulator.tick();
-
-        let mut ordered_positions = simulator.state().values().keys().copied().collect::<Vec<_>>();
-        ordered_positions.sort();
-
+    for snapshot in snapshots {
         let mut cells = BTreeMap::new();
-        for pos in ordered_positions {
-            let value = simulator
-                .state()
-                .get(pos)
-                .expect("position from state keys must exist");
+        for (pos, value) in snapshot.cells {
             cells.insert(format!("{},{}", pos.x, pos.y), u8::from(value));
         }
 
         results.push(TickStateJson {
-            tick: tick_index,
+            tick: snapshot.tick,
             cells,
         });
     }

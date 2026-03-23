@@ -91,3 +91,28 @@ fn step_can_pause_and_resume_without_behavior_change() {
 
     assert_eq!(by_tick.state(), by_step.state());
 }
+
+#[test]
+fn run_with_snapshots_collects_tick_states() {
+    let circuit = make_circuit(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            WireKind::Positive,
+        )],
+    );
+
+    let mut sim = Simulator::new(circuit);
+    sim.state_mut()
+        .set(Pos::new(0, 0), true)
+        .expect("state update must succeed");
+
+    let snapshots = sim.run_with_snapshots(2);
+
+    assert_eq!(snapshots.len(), 2);
+    assert_eq!(snapshots[0].tick, 1);
+    assert_eq!(snapshots[1].tick, 2);
+    assert_eq!(snapshots[0].cells[0], (Pos::new(0, 0), true));
+    assert_eq!(snapshots[0].cells[1], (Pos::new(1, 0), true));
+}
