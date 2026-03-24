@@ -16,3 +16,7 @@
 `Simulator` に `circuit()` アクセサを追加し、`circuit.sorted_cells()` を利用する。
 
 - 影響範囲: `simulation/engine.rs`（アクセサ追加）, `io/json.rs`（ソートの置き換え）
+
+## 関連タスク
+
+- [cell-merge-optimization.md](cell-merge-optimization.md): セルマージ最適化でも `Simulator::circuit()` アクセサが有用。両タスクは独立して実装可能。
