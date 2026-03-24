@@ -2,13 +2,15 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::circuit::{Circuit, Pos, Wire, WireKind};
+use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 use crate::simulation::Simulator;
 
 /// 回路 JSON 全体を表す入力モデル。
 #[derive(Debug, Deserialize)]
 pub struct CircuitJson {
     pub wires: Vec<WireJson>,
+    #[serde(default)]
+    pub generators: Vec<GeneratorJson>,
 }
 
 /// ワイヤ入力を表す JSON モデル。
@@ -17,6 +19,15 @@ pub struct WireJson {
     pub src: [i32; 2],
     pub dst: [i32; 2],
     pub kind: String,
+}
+
+/// ジェネレーター入力を表す JSON モデル。
+#[derive(Debug, Deserialize)]
+pub struct GeneratorJson {
+    pub target: [i32; 2],
+    pub pattern: String,
+    #[serde(default, rename = "loop")]
+    pub is_loop: bool,
 }
 
 /// シミュレーション出力 JSON のルート。
@@ -48,14 +59,34 @@ impl TryFrom<CircuitJson> for Circuit {
                 _ => return Err(format!("wire kind must be positive or negative: {}", wire.kind)),
             };
 
-
             cells.insert(src);
             cells.insert(dst);
             wires.push(Wire::new(src, dst, kind));
         }
 
-        Circuit::new(cells, wires)
+        let mut generators = Vec::with_capacity(value.generators.len());
+        for generator in value.generators {
+            let target = Pos::new(generator.target[0], generator.target[1]);
+            let pattern = parse_pattern(&generator.pattern)?;
+            generators.push(Generator::new(target, pattern, generator.is_loop));
+        }
+
+        Circuit::with_generators(cells, wires, generators)
     }
+}
+
+fn parse_pattern(pattern: &str) -> Result<Vec<bool>, String> {
+    pattern
+        .chars()
+        .map(|c| match c {
+            '1' => Ok(true),
+            '0' => Ok(false),
+            _ => Err(format!(
+                "invalid pattern character: '{}' (expected '0' or '1')",
+                c
+            )),
+        })
+        .collect()
 }
 
 /// 文字列 JSON から回路を読み込む。

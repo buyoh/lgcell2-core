@@ -1,0 +1,22 @@
+{
+  "ticks": 1,
+  "cases": [
+    {
+      "name": "base_tick1",
+      "expected": { "1,0": true }
+    },
+    {
+      "name": "case_ticks_override",
+      "ticks": 2,
+      "expected": { "1,0": false }
+    },
+    {
+      "name": "case_generator_override_loop",
+      "ticks": 3,
+      "generators": [
+        { "target": [0, 0], "pattern": "01", "loop": true }
+      ],
+      "expected": { "1,0": false }
+    }
+  ]
+}

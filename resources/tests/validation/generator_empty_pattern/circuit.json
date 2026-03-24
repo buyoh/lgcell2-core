@@ -1,0 +1,8 @@
+{
+  "wires": [
+    { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
+  ],
+  "generators": [
+    { "target": [2, 0], "pattern": "" }
+  ]
+}

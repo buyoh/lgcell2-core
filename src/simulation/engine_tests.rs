@@ -1,10 +1,15 @@
 use std::collections::BTreeSet;
 
-use crate::circuit::{Circuit, Pos, Wire, WireKind};
+use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 use crate::simulation::{Simulator, StepResult};
 
 fn make_circuit(cells: &[Pos], wires: Vec<Wire>) -> Circuit {
     Circuit::new(BTreeSet::from_iter(cells.iter().copied()), wires).expect("valid circuit")
+}
+
+fn make_circuit_with_generators(cells: &[Pos], wires: Vec<Wire>, generators: Vec<Generator>) -> Circuit {
+    Circuit::with_generators(BTreeSet::from_iter(cells.iter().copied()), wires, generators)
+        .expect("valid circuit")
 }
 
 #[test]
@@ -115,4 +120,59 @@ fn run_with_snapshots_collects_tick_states() {
     assert_eq!(snapshots[1].tick, 2);
     assert_eq!(snapshots[0].cells[0], (Pos::new(0, 0), true));
     assert_eq!(snapshots[0].cells[1], (Pos::new(1, 0), true));
+}
+
+#[test]
+fn generator_non_loop_holds_last_value() {
+    let circuit = make_circuit_with_generators(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            WireKind::Positive,
+        )],
+        vec![Generator::new(Pos::new(0, 0), vec![true, false], false)],
+    );
+
+    let mut sim = Simulator::new(circuit);
+    sim.run(3);
+
+    assert_eq!(sim.state().get(Pos::new(1, 0)), Some(false));
+}
+
+#[test]
+fn generator_loop_repeats_pattern() {
+    let circuit = make_circuit_with_generators(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            WireKind::Positive,
+        )],
+        vec![Generator::new(Pos::new(0, 0), vec![true, false], true)],
+    );
+
+    let mut sim = Simulator::new(circuit);
+    sim.run(3);
+
+    assert_eq!(sim.state().get(Pos::new(1, 0)), Some(true));
+}
+
+#[test]
+fn generator_is_applied_when_stepping_cell_by_cell() {
+    let circuit = make_circuit_with_generators(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            WireKind::Positive,
+        )],
+        vec![Generator::new(Pos::new(0, 0), vec![true], false)],
+    );
+
+    let mut sim = Simulator::new(circuit);
+    assert_eq!(sim.step(), StepResult::Continue);
+    assert_eq!(sim.step(), StepResult::TickComplete);
+
+    assert_eq!(sim.state().get(Pos::new(1, 0)), Some(true));
 }

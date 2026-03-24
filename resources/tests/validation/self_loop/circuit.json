@@ -1,0 +1,5 @@
+{
+  "wires": [
+    { "src": [0, 0], "dst": [0, 0], "kind": "positive" }
+  ]
+}

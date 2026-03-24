@@ -41,6 +41,7 @@ fn generate_tests() {
     for test in manifest.tests {
         match test.test_type.as_str() {
             "simulation" => write_simulation_tests(&mut f, &test),
+            "validation" => write_validation_test(&mut f, &test),
             _ => {
                 panic!("Unknown test type: {}", test.test_type);
             }
@@ -85,4 +86,23 @@ fn test_{}_{}_() {{
         )
         .unwrap();
     }
+}
+
+fn write_validation_test(f: &mut fs::File, test: &TestCase) {
+    let comment_line = if let Some(comment) = &test.comment {
+        format!("// {}\n", comment)
+    } else {
+        String::new()
+    };
+
+    writeln!(
+        f,
+        r#"{}#[test]
+fn test_{}_() {{
+    test_validation_case("{}")
+}}
+"#,
+        comment_line, test.name, test.path
+    )
+    .unwrap();
 }

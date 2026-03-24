@@ -1,7 +1,7 @@
 # ジェネレーター端子の設計
 
 作成日: 2026-03-24
-ステータス: 設計完了（未実装）
+ステータス: 実装完了
 
 ## 背景・動機
 
@@ -427,3 +427,14 @@ pub fn test_validation_case(test_dir: &str) {
     );
 }
 ```
+
+## 実装進捗
+
+- 2026-03-24: `src/circuit/generator.rs` を追加し、`Generator` の `value_at` を実装。
+- 2026-03-24: `Circuit::with_generators()` と generator 制約バリデーション（incoming wire 禁止、target 重複禁止、空 pattern 禁止）を実装。
+- 2026-03-24: `src/io/json.rs` を拡張し、`generators` フィールドと pattern パースを実装。
+- 2026-03-24: `Simulator` に tick 先頭での generator 適用処理を実装。
+- 2026-03-24: `tests/test_helpers.rs` を拡張し、case `ticks` override、case generators merge、validation テスト実行を実装。
+- 2026-03-24: `build.rs` を拡張し、`validation` テスト型の生成に対応。
+- 2026-03-24: manifest とテストデータを拡張（simulation 1件、validation 5件）。
+- 2026-03-24: `cargo test` を実行し、全テスト成功（unit + integration）。

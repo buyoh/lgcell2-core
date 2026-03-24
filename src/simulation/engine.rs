@@ -59,8 +59,24 @@ impl Simulator {
         }
     }
 
+    fn apply_generators(&mut self) {
+        for generator in self.circuit.generators() {
+            let value = generator.value_at(self.tick);
+            self.prev_state
+                .set(generator.target(), value)
+                .expect("generator target must exist in previous state");
+            self.curr_state
+                .set(generator.target(), value)
+                .expect("generator target must exist in current state");
+        }
+    }
+
     /// 1 セル分だけ進める。中断ポイント。
     pub fn step(&mut self) -> StepResult {
+        if self.cell_index == 0 {
+            self.apply_generators();
+        }
+
         let cell = self.circuit.sorted_cells()[self.cell_index];
         let incoming = self.circuit.incoming_indices(cell);
 

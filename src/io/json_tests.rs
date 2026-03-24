@@ -113,3 +113,52 @@ fn cells_are_inferred_from_wire_endpoints() {
     assert!(circuit.cells().contains(&crate::circuit::Pos::new(1, 0)));
     assert!(circuit.cells().contains(&crate::circuit::Pos::new(2, 0)));
 }
+
+#[test]
+fn parse_generators_and_apply_default_loop_false() {
+    let input = r#"
+    {
+      "wires": [
+        { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
+      ],
+      "generators": [
+        { "target": [0, 0], "pattern": "10" }
+      ]
+    }
+    "#;
+
+    let circuit = parse_circuit_json(input).expect("json must parse");
+    assert_eq!(circuit.generators().len(), 1);
+    assert_eq!(circuit.generators()[0].target(), crate::circuit::Pos::new(0, 0));
+    assert_eq!(circuit.generators()[0].pattern(), &[true, false]);
+    assert!(!circuit.generators()[0].is_loop());
+}
+
+#[test]
+fn parse_rejects_invalid_generator_pattern_char() {
+    let input = r#"
+    {
+      "wires": [
+        { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
+      ],
+      "generators": [
+        { "target": [0, 0], "pattern": "10x" }
+      ]
+    }
+    "#;
+
+    let err = parse_circuit_json(input).expect_err("must reject invalid pattern character");
+    assert!(err.contains("invalid pattern character"));
+}
+
+#[test]
+fn circuit_json_deserializes_without_generators() {
+    let input = r#"
+    {
+      "wires": []
+    }
+    "#;
+
+    let parsed: CircuitJson = serde_json::from_str(input).expect("must deserialize");
+    assert!(parsed.generators.is_empty());
+}

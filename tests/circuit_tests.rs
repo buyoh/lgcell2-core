@@ -1,4 +1,4 @@
-use test_helpers::test_simulation_case;
+use test_helpers::{test_simulation_case, test_validation_case};
 
 mod test_helpers;
 

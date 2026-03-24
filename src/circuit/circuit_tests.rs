@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::circuit::{Circuit, Pos, Wire, WireKind};
+use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 
 fn sample_cells() -> BTreeSet<Pos> {
     BTreeSet::from([
@@ -96,4 +96,68 @@ fn circuit_allows_reverse_direction_wires() {
 
     let circuit = Circuit::new(cells, wires).expect("circuit must be valid");
     assert_eq!(circuit.wires().len(), 2);
+}
+
+#[test]
+fn circuit_with_generators_adds_targets_to_cells() {
+    let cells = sample_cells();
+    let wires = vec![Wire::new(
+        Pos::new(0, 0),
+        Pos::new(1, 0),
+        WireKind::Positive,
+    )];
+    let generators = vec![Generator::new(Pos::new(9, 9), vec![true], false)];
+
+    let circuit = Circuit::with_generators(cells, wires, generators).expect("circuit must be valid");
+
+    assert!(circuit.cells().contains(&Pos::new(9, 9)));
+    assert_eq!(circuit.generators().len(), 1);
+}
+
+#[test]
+fn circuit_rejects_generator_target_with_incoming_wire() {
+    let cells = sample_cells();
+    let wires = vec![Wire::new(
+        Pos::new(0, 0),
+        Pos::new(2, 0),
+        WireKind::Positive,
+    )];
+    let generators = vec![Generator::new(Pos::new(2, 0), vec![true], false)];
+
+    let err = Circuit::with_generators(cells, wires, generators)
+        .expect_err("must reject generator on incoming target");
+    assert!(err.contains("must not have incoming wires"));
+}
+
+#[test]
+fn circuit_rejects_duplicate_generator_target() {
+    let cells = sample_cells();
+    let wires = vec![Wire::new(
+        Pos::new(0, 0),
+        Pos::new(1, 0),
+        WireKind::Positive,
+    )];
+    let generators = vec![
+        Generator::new(Pos::new(2, 0), vec![true], false),
+        Generator::new(Pos::new(2, 0), vec![false], true),
+    ];
+
+    let err = Circuit::with_generators(cells, wires, generators)
+        .expect_err("must reject duplicate generator target");
+    assert!(err.contains("duplicate generator target"));
+}
+
+#[test]
+fn circuit_rejects_empty_generator_pattern() {
+    let cells = sample_cells();
+    let wires = vec![Wire::new(
+        Pos::new(0, 0),
+        Pos::new(1, 0),
+        WireKind::Positive,
+    )];
+    let generators = vec![Generator::new(Pos::new(2, 0), Vec::new(), false)];
+
+    let err = Circuit::with_generators(cells, wires, generators)
+        .expect_err("must reject empty generator pattern");
+    assert!(err.contains("pattern must not be empty"));
 }
