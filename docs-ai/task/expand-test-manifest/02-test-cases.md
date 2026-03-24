@@ -579,7 +579,7 @@ S=(0,1)   →(1,1) OR_Q̄  →(2,1) Q̄    (NOR: NOT(OR(S, Q)))
 }
 ```
 
-**check.json**: generator で S/R を制御。
+**check.json**: per-case generator で S/R を制御。
 
 ```json
 {
@@ -588,19 +588,19 @@ S=(0,1)   →(1,1) OR_Q̄  →(2,1) Q̄    (NOR: NOT(OR(S, Q)))
     {
       "name": "set_then_hold",
       "comment": "S=1 で set → S=0 で hold。Q=1 を維持",
-      "generators": {
-        "0,0": [false, false, false, false],
-        "0,1": [true,  false, false, false]
-      },
+      "generators": [
+        { "target": [0, 0], "pattern": "0000" },
+        { "target": [0, 1], "pattern": "1000" }
+      ],
       "expected": { "2,0": true, "2,1": false }
     },
     {
       "name": "set_then_reset",
       "comment": "S=1 で set → R=1 で reset。Q=0",
-      "generators": {
-        "0,0": [false, false, true,  false],
-        "0,1": [true,  false, false, false]
-      },
+      "generators": [
+        { "target": [0, 0], "pattern": "001000" },
+        { "target": [0, 1], "pattern": "100000" }
+      ],
       "ticks": 6,
       "expected": { "2,0": false, "2,1": true }
     }
@@ -655,7 +655,7 @@ Q̄(2,1) ──Neg──→ (2,0)  Q への入力 (forward, immediate)
 }
 ```
 
-**check.json**: generator で J, K, CLK を制御。各操作後に安定するまでの tick を含める。
+**check.json**: per-case generator で J, K, CLK を制御。各操作後に安定するまでの tick を含める。
 
 ```json
 {
@@ -664,21 +664,21 @@ Q̄(2,1) ──Neg──→ (2,0)  Q への入力 (forward, immediate)
     {
       "name": "set",
       "comment": "J=1, K=0, CLK=1 → Q=1",
-      "generators": {
-        "0,0": [true,  true,  true,  false, false, false],
-        "0,1": [false, false, false, false, false, false],
-        "0,2": [true,  true,  true,  false, false, false]
-      },
+      "generators": [
+        { "target": [0, 0], "pattern": "111000" },
+        { "target": [0, 1], "pattern": "0" },
+        { "target": [0, 2], "pattern": "111000" }
+      ],
       "expected": { "2,0": true, "2,1": false }
     },
     {
       "name": "reset",
       "comment": "まず set してから、J=0, K=1, CLK=1 で reset → Q=0",
-      "generators": {
-        "0,0": [true,  true,  true,  false, false, false, false, false],
-        "0,1": [false, false, false, true,  true,  true,  false, false],
-        "0,2": [true,  true,  true,  true,  true,  true,  false, false]
-      },
+      "generators": [
+        { "target": [0, 0], "pattern": "11100000" },
+        { "target": [0, 1], "pattern": "00011100" },
+        { "target": [0, 2], "pattern": "11111100" }
+      ],
       "ticks": 8,
       "expected": { "2,0": false, "2,1": true }
     }

@@ -7,44 +7,279 @@
 
 順序回路（SR ラッチ、JK フリップフロップ、カウンター等）のテストでは、tick ごとに入力信号を変化させる必要がある。現在の `initial` フィールドは tick 0 の初期値しか設定できず、複数 tick にわたる入力パターンの制御が不可能である。
 
-ジェネレーターは、指定したセルに対して tick ごとに特定の bool パターンで値を注入する仕組み。
+ジェネレーターは、指定したセルに対して tick ごとに特定の bool パターンで値を注入する仕組み。テスト専用ではなく、通常の回路定義 (circuit.json) に組み込まれる回路モデルの一部として設計する。
 
 ## 設計・方針
 
 ### ジェネレーターの位置づけ
 
-ジェネレーターは **テスト基盤の概念** として check.json に定義する。回路定義 (circuit.json) には影響しない。
+ジェネレーターは **回路モデルの一部** として circuit.json および `Circuit` 構造体に定義する。シミュレータが tick ごとにジェネレーターの値を自動適用する。
 
-将来的にシミュレーション本体にジェネレーター機能を組み込む場合は、別タスクとして扱う。
+テスト用途では、check.json の per-case でジェネレーターを指定することで、回路定義のジェネレーターをオーバーライドできる。
 
 ### 制約
 
 1. **ジェネレーターの出力先セルは、Wire の dst であってはならない**
    - incoming wire を持つセルにジェネレーターを接続すると、tick 内で値の上書きが発生し、シミュレーション結果が不定になる
-   - テストランナーで `circuit.incoming_indices(target).is_empty()` を検証する
+   - `Circuit::new()` で `circuit.incoming_indices(target).is_empty()` を検証する
 2. **同一セルに対して複数のジェネレーターを定義できない**
-   - check.json の `generators` フィールドは `BTreeMap<String, Vec<bool>>` であり、キーの一意性により自然に保証される
-3. **パターン長が ticks より短い場合、最後の値を保持する**
-   - 例: `ticks: 5`, pattern `[true, false]` → tick 0: true, tick 1–4: false
+   - `Circuit::new()` で target の一意性を検証する
+3. **パターンは空であってはならない**
+   - `Circuit::new()` で pattern の長さ ≥ 1 を検証する
 
-### check.json スキーマ拡張
+### パターン表記
 
-#### 現行スキーマ
+パターンは文字列で表記する。`'1'` = true, `'0'` = false。
+
+```
+"101"  → [true, false, true]
+"0"    → [false]
+"1111" → [true, true, true, true]
+```
+
+`'0'`/`'1'` 以外の文字が含まれる場合はパースエラーとする。
+
+### 繰り返しモード (GeneratorMode)
+
+パターン長が tick 数を超えた場合の動作を 2 つのモードで制御する。
+
+| モード | JSON 値 | 動作 | 例: pattern `"10"`, tick 0–4 |
+|---|---|---|---|
+| Hold | `"hold"` | 最後の値を保持 | 1, 0, 0, 0, 0 |
+| Loop | `"loop"` | 先頭に戻って繰り返す | 1, 0, 1, 0, 1 |
+
+デフォルトは `"hold"`。
+
+```rust
+impl Generator {
+    pub fn value_at(&self, tick: u64) -> bool {
+        let idx = tick as usize;
+        match self.mode {
+            GeneratorMode::Hold => self.pattern[idx.min(self.pattern.len() - 1)],
+            GeneratorMode::Loop => self.pattern[idx % self.pattern.len()],
+        }
+    }
+}
+```
+
+## データモデル変更
+
+### 新規: Generator / GeneratorMode
+
+`src/circuit/` に `generator.rs` を追加。
+
+```rust
+/// ジェネレーターのパターン繰り返しモード。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum GeneratorMode {
+    /// パターン末尾到達後、最後の値を保持する。
+    Hold,
+    /// パターン末尾到達後、先頭に戻って繰り返す。
+    Loop,
+}
+
+/// tick ごとに指定パターンで値を注入するジェネレーター。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Generator {
+    target: Pos,
+    pattern: Vec<bool>,
+    mode: GeneratorMode,
+}
+
+impl Generator {
+    pub fn new(target: Pos, pattern: Vec<bool>, mode: GeneratorMode) -> Self {
+        Self { target, pattern, mode }
+    }
+
+    pub fn target(&self) -> Pos { self.target }
+    pub fn pattern(&self) -> &[bool] { &self.pattern }
+    pub fn mode(&self) -> GeneratorMode { self.mode }
+
+    /// 指定 tick における出力値を返す。
+    pub fn value_at(&self, tick: u64) -> bool {
+        let idx = tick as usize;
+        match self.mode {
+            GeneratorMode::Hold => self.pattern[idx.min(self.pattern.len() - 1)],
+            GeneratorMode::Loop => self.pattern[idx % self.pattern.len()],
+        }
+    }
+}
+```
+
+### Circuit 構造体の拡張
+
+```rust
+pub struct Circuit {
+    cells: BTreeSet<Pos>,
+    wires: Vec<Wire>,
+    generators: Vec<Generator>,           // 追加
+    incoming: HashMap<Pos, Vec<usize>>,
+    sorted_cells: Vec<Pos>,
+}
+```
+
+後方互換性のため、既存の `Circuit::new()` はジェネレーターなしで構築する。新規 `Circuit::with_generators()` を追加:
+
+```rust
+impl Circuit {
+    /// ジェネレーターなしで回路を構築する（既存互換）。
+    pub fn new(cells: BTreeSet<Pos>, wires: Vec<Wire>) -> Result<Self, String> {
+        Self::with_generators(cells, wires, Vec::new())
+    }
+
+    /// ジェネレーター付きで回路を構築する。
+    pub fn with_generators(
+        cells: BTreeSet<Pos>,
+        wires: Vec<Wire>,
+        generators: Vec<Generator>,
+    ) -> Result<Self, String> {
+        // 既存の wire バリデーション (self-loop, endpoint existence, duplicate wire)
+        // ... 
+
+        // --- 追加バリデーション ---
+        // generator target が incoming wire を持たないこと
+        for gen in &generators {
+            if incoming.get(&gen.target()).map_or(false, |v| !v.is_empty()) {
+                return Err(format!(
+                    "generator target ({},{}) must not have incoming wires",
+                    gen.target().x, gen.target().y
+                ));
+            }
+        }
+        // generator target の一意性
+        let mut gen_targets = std::collections::HashSet::new();
+        for gen in &generators {
+            if !gen_targets.insert(gen.target()) {
+                return Err(format!(
+                    "duplicate generator target is not allowed: ({},{})",
+                    gen.target().x, gen.target().y
+                ));
+            }
+        }
+        // pattern が空でないこと
+        for gen in &generators {
+            if gen.pattern().is_empty() {
+                return Err(format!(
+                    "generator pattern must not be empty: ({},{})",
+                    gen.target().x, gen.target().y
+                ));
+            }
+        }
+
+        Ok(Self { cells, wires, generators, incoming, sorted_cells })
+    }
+
+    pub fn generators(&self) -> &[Generator] { &self.generators }
+}
+```
+
+ジェネレーターの target セルは cells に自動追加する（wire の endpoint と同様）。
+
+### Simulator の変更
+
+tick ごとにジェネレーター値を適用する。適用タイミングは各 tick のセル処理開始前。
+
+```rust
+impl Simulator {
+    fn apply_generators(&mut self) {
+        for gen in self.circuit.generators() {
+            let value = gen.value_at(self.tick);
+            self.prev_state.set(gen.target(), value).unwrap();
+            self.curr_state.set(gen.target(), value).unwrap();
+        }
+    }
+}
+```
+
+`step()` の冒頭で `cell_index == 0` のとき `apply_generators()` を呼び出す:
+
+```rust
+fn step(&mut self) -> StepResult {
+    if self.cell_index == 0 {
+        self.apply_generators();
+    }
+    // ... 既存のセル処理
+}
+```
+
+これにより `tick()` と `step()` のどちらを使っても一貫した動作となる。
+
+## circuit.json スキーマ拡張
+
+### 現行スキーマ
 
 ```json
 {
-  "ticks": 1,
-  "cases": [
-    {
-      "name": "case_name",
-      "initial": { "0,0": true },
-      "expected": { "1,0": false }
-    }
+  "wires": [...]
+}
+```
+
+### 拡張後スキーマ
+
+```json
+{
+  "wires": [...],
+  "generators": [
+    { "target": [0, 0], "pattern": "101", "mode": "hold" },
+    { "target": [0, 1], "pattern": "010", "mode": "loop" }
   ]
 }
 ```
 
-#### 拡張後スキーマ
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `generators` | `GeneratorJson[]` | No | ジェネレーター定義の配列。省略時は空 |
+
+GeneratorJson:
+
+| フィールド | 型 | 必須 | 説明 |
+|---|---|---|---|
+| `target` | `[i32, i32]` | Yes | 出力先セルの座標 |
+| `pattern` | `string` | Yes | `'0'`/`'1'` の文字列パターン |
+| `mode` | `string` | No | `"hold"` (デフォルト) または `"loop"` |
+
+### JSON → 内部モデル変換
+
+`src/io/json.rs`:
+
+```rust
+#[derive(Debug, Deserialize)]
+pub struct CircuitJson {
+    pub wires: Vec<WireJson>,
+    #[serde(default)]
+    pub generators: Vec<GeneratorJson>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct GeneratorJson {
+    pub target: [i32; 2],
+    pub pattern: String,
+    #[serde(default = "default_mode")]
+    pub mode: String,
+}
+
+fn default_mode() -> String { "hold".to_string() }
+```
+
+パターン文字列のパース:
+
+```rust
+fn parse_pattern(s: &str) -> Result<Vec<bool>, String> {
+    s.chars()
+        .map(|c| match c {
+            '1' => Ok(true),
+            '0' => Ok(false),
+            _ => Err(format!("invalid pattern character: '{}' (expected '0' or '1')", c)),
+        })
+        .collect()
+}
+```
+
+## check.json スキーマ拡張（テスト用）
+
+テストでは check.json の per-case でジェネレーターを指定できる。circuit.json のジェネレーターと per-case ジェネレーターは target 単位でマージし、per-case が優先する。
+
+### 拡張後スキーマ
 
 ```json
 {
@@ -54,10 +289,10 @@
       "name": "case_name",
       "ticks": 3,
       "initial": { "2,0": false },
-      "generators": {
-        "0,0": [true, false, true],
-        "0,1": [false, true, false]
-      },
+      "generators": [
+        { "target": [0, 0], "pattern": "101" },
+        { "target": [0, 1], "pattern": "010", "mode": "loop" }
+      ],
       "expected": { "2,0": true }
     }
   ]
@@ -68,51 +303,21 @@
 
 | フィールド | 位置 | 型 | 必須 | 説明 |
 |---|---|---|---|---|
-| `ticks` | case 内 | `usize` | No | ファイルレベル `ticks` のオーバーライド。省略時はファイルレベル値を使用 |
-| `generators` | case 内 | `BTreeMap<String, Vec<bool>>` | No | セル座標 → tick ごとの値パターン |
-
-- `generators` と `initial` は同一セルに対して共存可（`generators[0]` が `initial` を上書きする）
-- `generators` のキーは `"x,y"` 形式（`initial` / `expected` と同一形式）
+| `ticks` | case 内 | `usize` | No | ファイルレベル `ticks` のオーバーライド |
+| `generators` | case 内 | `GeneratorJson[]` | No | per-case ジェネレーター。circuit.json を target 単位でオーバーライド |
 
 ### テストランナーの実行フロー
 
 ```
-1. circuit.json → Circuit を構築
+1. circuit.json → wires + circuit_generators を取得
 2. check.json → テストケースを取得
-3. Simulator::new(circuit)
-4. initial の値を state_mut().set() で設定
-5. for tick_i in 0..ticks:
-     a. generators の各エントリについて:
-        - pattern[min(tick_i, pattern.len() - 1)] の値を state_mut().set() で注入
-     b. sim.tick()
-6. expected の各値を検証
-```
-
-注意: ステップ 5a で `state_mut().set()` は `prev_state` と `curr_state` の両方を更新する。ジェネレーター対象セルは incoming wire を持たないため、tick 処理中に `curr_state[cell] = prev_state[cell]` が適用され、注入した値がそのまま保持される。
-
-### バリデーション
-
-テストランナーのセットアップ時に以下を検証する:
-
-```rust
-// generators の各ターゲットが incoming wire を持たないことを確認
-for pos_str in test_case.generators.keys() {
-    let pos = parse_pos(pos_str);
-    assert!(
-        circuit.incoming_indices(pos).is_empty(),
-        "Generator target {} must not have incoming wires",
-        pos_str
-    );
-}
-
-// generators のパターンが空でないことを確認
-for (pos_str, pattern) in &test_case.generators {
-    assert!(
-        !pattern.is_empty(),
-        "Generator pattern for {} must not be empty",
-        pos_str
-    );
-}
+3. for each case:
+   a. circuit_generators と case.generators を target 単位でマージ（case 優先）
+   b. Circuit::with_generators(cells, wires, merged_generators)
+   c. Simulator::new(circuit)
+   d. initial の値を state_mut().set() で設定
+   e. sim.run(ticks) で実行（ジェネレーターは Simulator が自動適用）
+   f. expected の各値を検証
 ```
 
 ### Rust 側の型定義変更
@@ -130,19 +335,27 @@ struct CheckFile {
 struct TestCase {
     name: String,
     #[serde(default)]
-    ticks: Option<usize>,  // 追加: per-case ticks オーバーライド
+    ticks: Option<usize>,
     #[serde(default)]
     initial: BTreeMap<String, bool>,
     #[serde(default)]
-    generators: BTreeMap<String, Vec<bool>>,  // 追加
+    generators: Vec<GeneratorJson>,  // circuit.json と同一形式
     #[serde(default)]
     expected: BTreeMap<String, bool>,
+}
+
+#[derive(serde::Deserialize)]
+struct GeneratorJson {
+    target: [i32; 2],
+    pattern: String,
+    #[serde(default = "default_mode")]
+    mode: String,
 }
 ```
 
 ### build.rs 側の変更
 
-build.rs では check.json から case 名を抽出するだけなので、`generators` フィールドの追加による変更は不要。ただし per-case `ticks` のフィールドが増えても `CaseEntry` は `name` のみを参照するため影響なし。
+build.rs では check.json から case 名を抽出するだけなので変更不要。
 
 ## validation テスト型の追加
 
