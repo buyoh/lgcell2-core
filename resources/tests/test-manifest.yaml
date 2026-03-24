@@ -1,0 +1,5 @@
+tests:
+  - name: half_adder
+    type: simulation
+    path: simulation/half_adder
+    comment: "半加算器の真理値表テスト"

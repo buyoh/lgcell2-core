@@ -4,7 +4,50 @@
 
 作成日: 2026-03-24
 ステータス: 設計中
+作成日: 2026-03-24
+ステータス: 実装完了
 
+## 実装進捗
+
+### 完了項目
+
+1. ✓ resources/tests/ ディレクトリ構造の作成
+  - resources/tests/test-manifest.yaml (テストインデックス)
+  - resources/tests/simulation/half_adder/circuit.json (回路定義)
+  - resources/tests/simulation/half_adder/check.json (テストケース)
+
+2. ✓ build.rs の実装
+  - test-manifest.yaml と check.json の読み込み
+  - 生成されたテスト関数の出力
+  - resources/tests の変更検知ロジック
+
+3. ✓ tests/test_helpers.rs の実装
+  - test_simulation_case() 関数実装
+  - circuit.json と check.json の読み込み
+  - Simulator の初期値設定と tick 実行
+  - expected の値の検証
+
+4. ✓ tests/circuit_tests.rs の作成
+  - generated_tests.rs の include
+  - test_simulation_case() のインポート
+
+5. ✓ Cargo.toml の更新
+  - [build-dependencies] に serde_yaml, serde_json を追加
+
+6. ✓ 既存テスト (tests/half_adder.rs) の削除
+  - .trash/ に移動
+
+7. ✓ テスト実行確認
+  - 4つのテストケース (0_plus_0, 0_plus_1, 1_plus_0, 1_plus_1) が全て成功
+  - 既存の Unit/Feature テストも全て成功 (21 項目)
+
+## 技術的な注記
+
+- CircuitJson は src/io/json.rs で parse_circuit_json() を提供
+- SimState::get() は Option<bool> を返す (Result ではない)
+- テストケース内の座標は "x,y" 形式で文字列化される
+- build.rs で生成されたコードは $OUT_DIR/generated_tests.rs に配置される
+- 回路定義と テストケースは完全に分離され、 check.json が複数の cases を持つことで複数シナリオに対応
 ## 背景・動機
 
 現在 `tests/half_adder.rs` ではテストケース（回路定義・初期値・期待値）が Rust コードに直接埋め込まれている。この方式には以下の問題がある:
