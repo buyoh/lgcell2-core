@@ -1,6 +1,6 @@
-# lgcell2-it: インタラクティブ CLI エントリポイント
+# lgcell2 --interactive: インタラクティブモード
 
-標準入力から改行ベースのコマンドを受け付け、回路の編集・シミュレーションをインタラクティブに操作できる CLI ツールを新規作成する。
+`lgcell2` に `--interactive` フラグを追加し、標準入力から改行ベースのコマンドを受け付けて回路の編集・シミュレーションをインタラクティブに操作できるモードを実装する。
 
 作成日: 2026-03-24
 ステータス: 設計完了（未実装）
@@ -13,7 +13,7 @@
 - シミュレーションの段階的な実行（任意の tick 数ずつ進める）
 - 途中経過の確認（特定セルの状態取得）
 
-`lgcell2-it` はこれらを改行ベースのテキストコマンドで提供する。人間が直接対話することを想定し、レスポンスは読みやすいテキストで返す。
+`lgcell2 --interactive` はこれらを改行ベースのテキストコマンドで提供する。人間が直接対話することを想定し、レスポンスは読みやすいテキストで返す。
 
 ## 設計・方針
 
@@ -71,23 +71,32 @@ ERR unknown command: foo
 
 ### CLI 引数
 
-`lgcell2` と同様に、起動時にファイルまたは標準入力から JSON 回路を読み込める。読み込んだ回路はワイヤ一覧として Editing 状態に投入される（自動 compile はしない）。
+既存の `lgcell2` CLI に `--interactive` (`-i`) フラグを追加する。
 
 ```
-lgcell2-it [file]
+lgcell2 --interactive [file]
+lgcell2 -i [file]
 ```
 
-- `file`: 回路定義 JSON ファイル（省略可）。省略時は空の状態でインタラクティブモードに入る
+- `--interactive` / `-i`: インタラクティブモードで起動する
+- `file`: 回路定義 JSON ファイル（省略可）。指定時はワイヤ一覧として Editing 状態に投入される（自動 compile はしない）。省略時は空の状態で開始
+- `--ticks` は `--interactive` と排他。両方指定時はエラーを返す
 
-`lgcell2` とは異なり、file 引数を指定しても標準入力はコマンド入力に使用される（JSON 読み込みには使われない）。
+`--interactive` 指定時、file 引数があってもなくても標準入力はコマンド入力に使用される（JSON 読み込みには使われない）。
+`--interactive` を指定しない場合の動作は従来通り。
 
 ### モジュール構成
 
+インタラクティブモードのロジックは `src/interactive/` モジュールとしてライブラリ側に配置する。CLI 固有の stdin/stdout ループのみ `src/bin/lgcell2/` に追加する。
+
 ```
-src/bin/lgcell2-it/
-    main.rs       # CLI 引数解析、stdin/stdout ループ
-    session.rs    # InteractiveSession: 状態管理とコマンド実行
-    command.rs    # Command enum とパーサー
+src/
+    interactive/
+        mod.rs        # pub use
+        command.rs    # Command enum とパーサー
+        session.rs    # InteractiveSession: 状態管理とコマンド実行
+src/bin/lgcell2/
+    main.rs           # --interactive フラグ追加、分岐処理
 ```
 
 #### command.rs
@@ -120,18 +129,26 @@ pub struct InteractiveSession {
 - `execute(&mut self, cmd: Command) -> String` でコマンドを処理し、レスポンス文字列を返す
 - `Wire` 追加時にセルは自動推論される（`Circuit::new` に委譲）
 
-#### main.rs
+#### main.rs の変更
 
 ```rust
 #[derive(Debug, Parser)]
-#[command(name = "lgcell2-it")]
+#[command(name = "lgcell2")]
 struct Cli {
-    /// 回路定義 JSON ファイル（省略可）
+    /// 回路定義 JSON ファイル。省略時は標準入力から読み込み。
     file: Option<PathBuf>,
+
+    /// シミュレーションする tick 数
+    #[arg(short, long, default_value_t = 100)]
+    ticks: u64,
+
+    /// インタラクティブモード
+    #[arg(short, long)]
+    interactive: bool,
 }
 ```
 
-`BufRead::lines()` で stdin を 1 行ずつ読み、`parse_command` → `session.execute` → stdout に出力するループ。
+`interactive` が true の場合、`run_interactive()` に分岐する。`BufRead::lines()` で stdin を 1 行ずつ読み、`parse_command` → `session.execute` → stdout に出力するループ。
 
 ### セルの自動管理
 
@@ -149,12 +166,13 @@ struct Cli {
 
 ### 既存タスクとの関係
 
-- **separate-clap-dependency**: `lgcell2-it` も clap を使用するバイナリのため、feature flag 実装時に `required-features = ["cli"]` を追加する必要がある。現時点では通常のバイナリとして追加する
+- **separate-clap-dependency**: 既存の `lgcell2` バイナリへの統合のため、追加の `[[bin]]` セクションは不要。feature flag 対応にも影響しない
 
 ## ステップ
 
-1. `src/bin/lgcell2-it/command.rs` — Command enum とパーサーの実装 + テスト
-2. `src/bin/lgcell2-it/session.rs` — InteractiveSession の実装 + テスト
-3. `src/bin/lgcell2-it/main.rs` — CLI 引数・stdin ループの実装
-4. `Cargo.toml` — `[[bin]]` セクションの追加
-5. 結合テスト（手動動作確認）
+1. `src/interactive/command.rs` — Command enum とパーサーの実装 + テスト
+2. `src/interactive/session.rs` — InteractiveSession の実装 + テスト
+3. `src/interactive/mod.rs` — モジュール公開
+4. `src/lib.rs` — `pub mod interactive;` 追加
+5. `src/bin/lgcell2/main.rs` — `--interactive` フラグ追加、分岐処理の実装
+6. 結合テスト（手動動作確認）
