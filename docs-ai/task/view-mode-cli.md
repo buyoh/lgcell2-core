@@ -30,7 +30,7 @@ lgcell2 --view  (標準入力から JSON 読み込み後にビューモードへ
 .._##_....##.._.._..
 .._##_..............
 ....................
-tick:42 | running               (q:quit space:pause arrows:scroll)
+tick:42 | running | (0,0)-(19,4)          (q:quit space:pause arrows:scroll)
 ```
 
 - 端末全体をグリッド表示に使用する
@@ -50,10 +50,11 @@ tick:42 | running               (q:quit space:pause arrows:scroll)
 最下行に以下の形式で表示する。全てのメッセージは英語とする。
 
 ```
-tick:<現在のtick> | <running/paused>               (q:quit space:pause arrows:scroll)
+tick:42 | running | (0,0)-(79,23)          (q:quit space:pause arrows:scroll)
 ```
 
-- 左寄せで tick 番号と状態を表示
+- 左寄せで tick 番号、状態、表示領域の座標範囲を表示
+  - `(x1,y1)-(x2,y2)`: ビューポートの左上座標と右下座標
 - 右寄せで操作ヘルプを表示
 
 ### キー操作
