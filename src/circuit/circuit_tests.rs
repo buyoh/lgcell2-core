@@ -61,3 +61,39 @@ fn circuit_rejects_self_loop() {
     let err = Circuit::new(cells, wires).expect_err("must reject self-loop");
     assert!(err.contains("self-loop wire is not allowed"));
 }
+
+#[test]
+fn circuit_rejects_duplicate_wire_same_kind() {
+    let cells = sample_cells();
+    let wires = vec![
+        Wire::new(Pos::new(0, 0), Pos::new(2, 0), WireKind::Positive),
+        Wire::new(Pos::new(0, 0), Pos::new(2, 0), WireKind::Positive),
+    ];
+
+    let err = Circuit::new(cells, wires).expect_err("must reject duplicate wire");
+    assert!(err.contains("duplicate wire is not allowed"));
+}
+
+#[test]
+fn circuit_rejects_duplicate_wire_different_kind() {
+    let cells = sample_cells();
+    let wires = vec![
+        Wire::new(Pos::new(0, 0), Pos::new(2, 0), WireKind::Positive),
+        Wire::new(Pos::new(0, 0), Pos::new(2, 0), WireKind::Negative),
+    ];
+
+    let err = Circuit::new(cells, wires).expect_err("must reject duplicate wire");
+    assert!(err.contains("duplicate wire is not allowed"));
+}
+
+#[test]
+fn circuit_allows_reverse_direction_wires() {
+    let cells = sample_cells();
+    let wires = vec![
+        Wire::new(Pos::new(0, 0), Pos::new(2, 0), WireKind::Positive),
+        Wire::new(Pos::new(2, 0), Pos::new(0, 0), WireKind::Positive),
+    ];
+
+    let circuit = Circuit::new(cells, wires).expect("circuit must be valid");
+    assert_eq!(circuit.wires().len(), 2);
+}

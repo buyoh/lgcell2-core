@@ -50,6 +50,21 @@ fn parse_rejects_self_loop() {
 }
 
 #[test]
+fn parse_rejects_duplicate_wires() {
+    let input = r#"
+    {
+      "wires": [
+        { "src": [0, 0], "dst": [1, 0], "kind": "positive" },
+        { "src": [0, 0], "dst": [1, 0], "kind": "negative" }
+      ]
+    }
+    "#;
+
+    let err = parse_circuit_json(input).expect_err("must reject duplicate wires");
+    assert!(err.contains("duplicate wire is not allowed"));
+}
+
+#[test]
 fn output_json_has_expected_shape() {
     let input = r#"
     {

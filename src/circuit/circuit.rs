@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::circuit::{Pos, Wire};
 
@@ -19,6 +19,8 @@ pub struct Circuit {
 impl Circuit {
     /// セル定義とワイヤ定義から回路を構築する。
     pub fn new(cells: BTreeSet<Pos>, wires: Vec<Wire>) -> Result<Self, String> {
+        let mut seen_pairs: HashSet<(Pos, Pos)> = HashSet::new();
+
         for wire in &wires {
             if wire.src == wire.dst {
                 return Err(format!(
@@ -38,6 +40,13 @@ impl Circuit {
                 return Err(format!(
                     "wire dst does not exist in cells: ({}, {})",
                     wire.dst.x, wire.dst.y
+                ));
+            }
+
+            if !seen_pairs.insert((wire.src, wire.dst)) {
+                return Err(format!(
+                    "duplicate wire is not allowed: src=({}, {}), dst=({}, {})",
+                    wire.src.x, wire.src.y, wire.dst.x, wire.dst.y
                 ));
             }
         }
