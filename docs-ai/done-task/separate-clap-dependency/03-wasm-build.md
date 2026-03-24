@@ -1,7 +1,7 @@
 # フェーズ 3: WASM ビルドスクリプト整備
 
 作成日: 2026-03-24
-ステータス: 未着手
+ステータス: 完了
 
 ## 概要
 
@@ -76,3 +76,14 @@ panic = "abort"
 
 - `--target bundler` は ES Modules 形式で出力する。Node.js から直接使用する場合は、WASM ファイルの手動読み込みが必要（フェーズ 4 参照）
 - `--target nodejs` にすると Node.js 専用の出力になるが、ブラウザ互換性を考慮して `bundler` を採用する
+
+## 実施内容
+
+- ルートに `build-wasm.sh` を作成し実行権限を付与
+- `.gitignore` に `pkg/`, `pkg-dev/` を追加
+- `Cargo.toml` に `wasm-pack` release profile と `[profile.release]` を追加
+
+## 検証結果
+
+- `./build-wasm.sh`: 成功
+- `pkg/` と `pkg-dev/` に `.wasm`, `.js`, `.d.ts`, `package.json` の生成を確認

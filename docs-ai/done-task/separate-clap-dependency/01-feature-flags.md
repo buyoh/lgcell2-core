@@ -1,7 +1,7 @@
 # フェーズ 1: feature flag による clap 依存分離
 
 作成日: 2026-03-24
-ステータス: 未着手
+ステータス: 完了
 
 ## 概要
 
@@ -76,3 +76,17 @@ pub mod wasm_api;
 
 - `build.rs` で `serde_yaml` を使用しているが、これは `[build-dependencies]` なのでランタイム依存には含まれない。wasm ビルドに影響しない
 - `edition = "2024"` を使用している。wasm-pack との互換性を確認する必要がある
+
+## 実施内容
+
+- `Cargo.toml` に `[lib] crate-type = ["cdylib", "rlib"]` を追加
+- feature flag を導入（`default = ["cli"]`, `cli`, `wasm`）
+- `clap` を optional dependency 化し、`wasm-bindgen` / `serde-wasm-bindgen` を optional 追加
+- `[[bin]]` に `required-features = ["cli"]` を追加
+- `src/lib.rs` で `#[cfg(feature = "wasm")] pub mod wasm_api;` を追加
+
+## 検証結果
+
+- `cargo build`: 成功
+- `cargo test`: 成功
+- `cargo build --target wasm32-unknown-unknown --lib --no-default-features`: 成功

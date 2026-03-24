@@ -1,7 +1,7 @@
 # フェーズ 2: WASM API レイヤー実装
 
 作成日: 2026-03-24
-ステータス: 未着手
+ステータス: 完了
 
 ## 概要
 
@@ -54,3 +54,16 @@ pub fn simulate(circuit_json: &str, ticks: u64) -> Result<String, JsError> {
 1. `src/wasm_api.rs` を作成（上記コード）
 2. `src/lib.rs` の `#[cfg(feature = "wasm")] pub mod wasm_api;` を有効化
 3. `cargo build --target wasm32-unknown-unknown --lib --no-default-features --features wasm` でビルドが通ることを確認
+
+## 実施内容
+
+- `src/wasm_api.rs` を追加し、`simulate(circuit_json: &str, ticks: u64) -> Result<String, JsError>` を実装
+- `src/lib.rs` 側で `wasm` feature 時の公開を有効化
+- `src/wasm_api.rs` にユニットテストを追加
+    - 正常系: 3 tick 実行で結果 JSON に `ticks` が含まれる
+    - 異常系: 非 wasm 環境で `JsError` 生成が panic する制約があるため `wasm32` 限定テストとして定義
+
+## 検証結果
+
+- `cargo build --target wasm32-unknown-unknown --lib --no-default-features --features wasm`: 成功
+- `cargo test --no-default-features --features wasm --lib`: 成功
