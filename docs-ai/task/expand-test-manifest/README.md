@@ -27,9 +27,9 @@ test-manifest に多数のテストケースを追加し、テスト基盤の拡
 
 ### Phase 1: ジェネレーター機能の実装
 
-1. **Generator / GeneratorMode 型の追加** — `src/circuit/generator.rs` に `Generator`, `GeneratorMode` を定義
+1. **Generator 型の追加** — `src/circuit/generator.rs` に `Generator` を定義（`is_loop: bool` フラグ）
 2. **Circuit 拡張** — `with_generators()` コンストラクタ、ジェネレーターバリデーション追加
-3. **circuit.json スキーマ拡張** — `generators` フィールドのパース（パターン文字列 `"101"` 形式、mode `"hold"` / `"loop"`）
+3. **circuit.json スキーマ拡張** — `generators` フィールドのパース（パターン文字列 `"101"` 形式、`"loop": true` フラグ）
 4. **Simulator 拡張** — tick 開始時のジェネレーター値自動適用
 
 ### Phase 2: テスト基盤の拡張

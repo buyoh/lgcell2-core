@@ -39,24 +39,23 @@
 
 `'0'`/`'1'` 以外の文字が含まれる場合はパースエラーとする。
 
-### 繰り返しモード (GeneratorMode)
+### 繰り返しモード (loop)
 
-パターン長が tick 数を超えた場合の動作を 2 つのモードで制御する。
+パターン長が tick 数を超えた場合の動作を `loop` フラグで制御する。
 
-| モード | JSON 値 | 動作 | 例: pattern `"10"`, tick 0–4 |
-|---|---|---|---|
-| Hold | `"hold"` | 最後の値を保持 | 1, 0, 0, 0, 0 |
-| Loop | `"loop"` | 先頭に戻って繰り返す | 1, 0, 1, 0, 1 |
-
-デフォルトは `"hold"`。
+| `loop` | 動作 | 例: pattern `"10"`, tick 0–4 |
+|---|---|---|
+| `false` (デフォルト) | 最後の値を保持 | 1, 0, 0, 0, 0 |
+| `true` | 先頭に戻って繰り返す | 1, 0, 1, 0, 1 |
 
 ```rust
 impl Generator {
     pub fn value_at(&self, tick: u64) -> bool {
         let idx = tick as usize;
-        match self.mode {
-            GeneratorMode::Hold => self.pattern[idx.min(self.pattern.len() - 1)],
-            GeneratorMode::Loop => self.pattern[idx % self.pattern.len()],
+        if self.is_loop {
+            self.pattern[idx % self.pattern.len()]
+        } else {
+            self.pattern[idx.min(self.pattern.len() - 1)]
         }
     }
 }
@@ -64,43 +63,35 @@ impl Generator {
 
 ## データモデル変更
 
-### 新規: Generator / GeneratorMode
+### 新規: Generator
 
 `src/circuit/` に `generator.rs` を追加。
 
 ```rust
-/// ジェネレーターのパターン繰り返しモード。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum GeneratorMode {
-    /// パターン末尾到達後、最後の値を保持する。
-    Hold,
-    /// パターン末尾到達後、先頭に戻って繰り返す。
-    Loop,
-}
-
 /// tick ごとに指定パターンで値を注入するジェネレーター。
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Generator {
     target: Pos,
     pattern: Vec<bool>,
-    mode: GeneratorMode,
+    is_loop: bool,
 }
 
 impl Generator {
-    pub fn new(target: Pos, pattern: Vec<bool>, mode: GeneratorMode) -> Self {
-        Self { target, pattern, mode }
+    pub fn new(target: Pos, pattern: Vec<bool>, is_loop: bool) -> Self {
+        Self { target, pattern, is_loop }
     }
 
     pub fn target(&self) -> Pos { self.target }
     pub fn pattern(&self) -> &[bool] { &self.pattern }
-    pub fn mode(&self) -> GeneratorMode { self.mode }
+    pub fn is_loop(&self) -> bool { self.is_loop }
 
     /// 指定 tick における出力値を返す。
     pub fn value_at(&self, tick: u64) -> bool {
         let idx = tick as usize;
-        match self.mode {
-            GeneratorMode::Hold => self.pattern[idx.min(self.pattern.len() - 1)],
-            GeneratorMode::Loop => self.pattern[idx % self.pattern.len()],
+        if self.is_loop {
+            self.pattern[idx % self.pattern.len()]
+        } else {
+            self.pattern[idx.min(self.pattern.len() - 1)]
         }
     }
 }
@@ -220,8 +211,8 @@ fn step(&mut self) -> StepResult {
 {
   "wires": [...],
   "generators": [
-    { "target": [0, 0], "pattern": "101", "mode": "hold" },
-    { "target": [0, 1], "pattern": "010", "mode": "loop" }
+    { "target": [0, 0], "pattern": "101" },
+    { "target": [0, 1], "pattern": "010", "loop": true }
   ]
 }
 ```
@@ -236,7 +227,7 @@ GeneratorJson:
 |---|---|---|---|
 | `target` | `[i32, i32]` | Yes | 出力先セルの座標 |
 | `pattern` | `string` | Yes | `'0'`/`'1'` の文字列パターン |
-| `mode` | `string` | No | `"hold"` (デフォルト) または `"loop"` |
+| `loop` | `bool` | No | `true` で先頭に戻って繰り返す。デフォルト `false`（最後の値を保持） |
 
 ### JSON → 内部モデル変換
 
@@ -254,11 +245,9 @@ pub struct CircuitJson {
 pub struct GeneratorJson {
     pub target: [i32; 2],
     pub pattern: String,
-    #[serde(default = "default_mode")]
-    pub mode: String,
+    #[serde(default, rename = "loop")]
+    pub is_loop: bool,
 }
-
-fn default_mode() -> String { "hold".to_string() }
 ```
 
 パターン文字列のパース:
@@ -291,7 +280,7 @@ fn parse_pattern(s: &str) -> Result<Vec<bool>, String> {
       "initial": { "2,0": false },
       "generators": [
         { "target": [0, 0], "pattern": "101" },
-        { "target": [0, 1], "pattern": "010", "mode": "loop" }
+        { "target": [0, 1], "pattern": "010", "loop": true }
       ],
       "expected": { "2,0": true }
     }
@@ -348,8 +337,8 @@ struct TestCase {
 struct GeneratorJson {
     target: [i32; 2],
     pattern: String,
-    #[serde(default = "default_mode")]
-    mode: String,
+    #[serde(default, rename = "loop")]
+    is_loop: bool,
 }
 ```
 
