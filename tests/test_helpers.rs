@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use lgcell2_core::base::ParseError;
-use lgcell2_core::circuit::{Circuit, Generator, Pos, Wire, WireKind};
-use lgcell2_core::io::json::CircuitJson;
+use lgcell2_core::circuit::{Circuit, Generator, Pos, Wire};
+use lgcell2_core::io::json::{parse_pattern, parse_wire_kind, CircuitJson};
 use lgcell2_core::simulation::Simulator;
 
 #[derive(serde::Deserialize)]
@@ -125,28 +125,6 @@ fn build_circuit_with_case_generators(
 
     let generators = generators_by_target.into_values().collect::<Vec<_>>();
     Circuit::with_generators(cells, wires, generators).map_err(ParseError::from)
-}
-
-fn parse_wire_kind(kind: &str) -> Result<WireKind, ParseError> {
-    match kind {
-        "positive" => Ok(WireKind::Positive),
-        "negative" => Ok(WireKind::Negative),
-        _ => Err(ParseError::InvalidWireKind(kind.to_string())),
-    }
-}
-
-fn parse_pattern(pattern: &str) -> Result<Vec<bool>, ParseError> {
-    pattern
-        .chars()
-        .map(|c| match c {
-            '1' => Ok(true),
-            '0' => Ok(false),
-            _ => Err(ParseError::InvalidWireKind(format!(
-                "invalid pattern character: '{}' (expected '0' or '1')",
-                c
-            ))),
-        })
-        .collect()
 }
 
 fn parse_pos(pos_str: &str) -> Pos {

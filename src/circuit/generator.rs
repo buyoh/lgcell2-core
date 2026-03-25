@@ -35,11 +35,13 @@ impl Generator {
 
     /// 指定 tick における出力値を返す。
     pub fn value_at(&self, tick: u64) -> bool {
-        let idx = tick as usize;
+        // wasm32 では usize が 32 ビットのため tick as usize で上位ビットが切り捨てられる。
+        // そのため、インデックス計算は u64 のまま行い、最後だけ usize にキャストする。
+        let len = self.pattern.len() as u64;
         if self.is_loop {
-            self.pattern[idx % self.pattern.len()]
+            self.pattern[(tick % len) as usize]
         } else {
-            self.pattern[idx.min(self.pattern.len() - 1)]
+            self.pattern[tick.min(len - 1) as usize]
         }
     }
 }

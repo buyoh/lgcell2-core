@@ -49,7 +49,7 @@ pub enum ParseError {
 
 ---
 
-## 2. tests/test_helpers.rs と io/json.rs にコードが重複している
+## ~~2. tests/test_helpers.rs と io/json.rs にコードが重複している~~ (対応済み)
 
 重要度: **medium**
 
@@ -84,7 +84,7 @@ pub enum ParseError {
 
 ---
 
-## 3. Generator::value_at で u64 → usize へのキャストが wasm32 で切り捨てを起こす
+## ~~3. Generator::value_at で u64 → usize へのキャストが wasm32 で切り捨てを起こす~~ (対応済み)
 
 重要度: **low**
 

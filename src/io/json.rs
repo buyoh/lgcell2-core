@@ -54,11 +54,7 @@ impl TryFrom<CircuitJson> for Circuit {
         for wire in value.wires {
             let src = Pos::new(wire.src[0], wire.src[1]);
             let dst = Pos::new(wire.dst[0], wire.dst[1]);
-            let kind = match wire.kind.as_str() {
-                "positive" => WireKind::Positive,
-                "negative" => WireKind::Negative,
-                _ => return Err(ParseError::InvalidWireKind(wire.kind)),
-            };
+            let kind = parse_wire_kind(&wire.kind)?;
 
             cells.insert(src);
             cells.insert(dst);
@@ -76,7 +72,17 @@ impl TryFrom<CircuitJson> for Circuit {
     }
 }
 
-fn parse_pattern(pattern: &str) -> Result<Vec<bool>, ParseError> {
+/// ワイヤ種別文字列を WireKind に変換する。
+pub fn parse_wire_kind(kind: &str) -> Result<WireKind, ParseError> {
+    match kind {
+        "positive" => Ok(WireKind::Positive),
+        "negative" => Ok(WireKind::Negative),
+        _ => Err(ParseError::InvalidWireKind(kind.to_string())),
+    }
+}
+
+/// パターン文字列 (`"0"` / `"1"` の並び) を bool ベクタに変換する。
+pub fn parse_pattern(pattern: &str) -> Result<Vec<bool>, ParseError> {
     pattern
         .chars()
         .map(|c| match c {
