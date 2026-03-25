@@ -3,7 +3,19 @@
 WASM API をステートレスな関数呼び出しから、状態を保持する `WasmSimulator` クラスベースに変更する。型付きデータ構造で JS と Rust 間のデータ交換を行い、tick 単位の実行・ステップ分割実行（UI フリーズ防止）を提供する。
 
 作成日: 2026-03-26
-ステータス: 設計完了（未実装）
+ステータス: 実装完了
+
+## 進捗
+
+- 2026-03-26: 実装完了
+  - `Cargo.toml` に `tsify-next = "0.5"` を追加し、`wasm` feature に含める
+  - `wasm_api.rs` を `wasm_api/` ディレクトリに分割（mod.rs / types.rs / simulator.rs / legacy.rs）
+  - `WasmCircuitInput`, `WasmWireInput`, `WasmWireKind`, `WasmGeneratorInput` を `types.rs` に定義（`Tsify` derive）
+  - `WasmCellState`, `WasmTickResult`, `WasmStepRunResult` を `types.rs` に定義
+  - `WasmSimulator` クラスを `simulator.rs` に実装（`new`, `from_json`, `run`, `run_steps`, `current_tick`, `get_state`, `get_cell`, `set_cell`）
+  - 既存の `simulate` / `simulate_n` を `legacy.rs` に移動
+  - Unit テスト 11 件を追加（うち 2 件は wasm32 限定）
+  - 全テスト Pass（60 + 6 + 47 tests）
 
 ## 背景・動機
 
@@ -159,9 +171,6 @@ impl WasmSimulator {
     /// JSON 文字列から Simulator を構築する（後方互換）。
     #[wasm_bindgen(js_name = "fromJson")]
     pub fn from_json(circuit_json: &str) -> Result<WasmSimulator, JsError>;
-
-    /// 1 tick 実行し結果を返す。
-    pub fn tick(&mut self) -> WasmTickResult;
 
     /// 指定 tick 数を実行し、最終状態を返す。
     pub fn run(&mut self, ticks: u32) -> WasmTickResult;

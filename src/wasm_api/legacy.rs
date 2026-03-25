@@ -2,24 +2,23 @@ use wasm_bindgen::prelude::*;
 
 use crate::io::json::{output_json_to_string, parse_circuit_json, simulate_to_output_json};
 
-/// Simulates a circuit encoded as JSON and returns output history JSON.
+/// 回路 JSON をシミュレーションし、出力履歴 JSON を返す。
 ///
-/// `ticks` is `u64` (JavaScript `BigInt`).
+/// `ticks` は `u64`（JavaScript `BigInt`）。
 #[wasm_bindgen]
 pub fn simulate(circuit_json: &str, ticks: u64) -> Result<String, JsError> {
     simulate_inner(circuit_json, ticks)
 }
 
-/// Simulates a circuit encoded as JSON and returns output history JSON.
+/// 回路 JSON をシミュレーションし、出力履歴 JSON を返す。
 ///
-/// `ticks` is `u32` (JavaScript `number`).
+/// `ticks` は `u32`（JavaScript `number`）。
 #[wasm_bindgen]
 pub fn simulate_n(circuit_json: &str, ticks: u32) -> Result<String, JsError> {
     simulate_inner(circuit_json, u64::from(ticks))
 }
 
 fn simulate_inner(circuit_json: &str, ticks: u64) -> Result<String, JsError> {
-    // JsError::new expects &str, so convert errors to string first
     let circuit =
         parse_circuit_json(circuit_json).map_err(|e| JsError::new(&e.to_string()))?;
     let output = simulate_to_output_json(circuit, ticks);
