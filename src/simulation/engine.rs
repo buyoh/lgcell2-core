@@ -162,6 +162,11 @@ impl Simulator {
         snapshots
     }
 
+    /// 回路定義を取得する。
+    pub fn circuit(&self) -> &Circuit {
+        &self.circuit
+    }
+
     /// 現在の状態を取得する。
     pub fn state(&self) -> &SimState {
         &self.prev_state

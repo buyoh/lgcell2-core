@@ -172,3 +172,18 @@ fn generator_is_applied_when_stepping_cell_by_cell() {
 
     assert_eq!(sim.state().get(Pos::new(1, 0)), Some(true));
 }
+
+#[test]
+fn circuit_accessor_returns_original_circuit() {
+    let cells = [Pos::new(0, 0), Pos::new(1, 0)];
+    let wires = vec![Wire::new(
+        Pos::new(0, 0),
+        Pos::new(1, 0),
+        WireKind::Positive,
+    )];
+    let circuit = make_circuit(&cells, wires);
+    let sim = Simulator::new(circuit.clone());
+
+    assert_eq!(sim.circuit().sorted_cells(), circuit.sorted_cells());
+    assert_eq!(sim.circuit().wires(), circuit.wires());
+}
