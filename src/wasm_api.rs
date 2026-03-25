@@ -19,9 +19,11 @@ pub fn simulate_n(circuit_json: &str, ticks: u32) -> Result<String, JsError> {
 }
 
 fn simulate_inner(circuit_json: &str, ticks: u64) -> Result<String, JsError> {
-    let circuit = parse_circuit_json(circuit_json).map_err(|e| JsError::new(&e))?;
+    // JsError::new expects &str, so convert errors to string first
+    let circuit =
+        parse_circuit_json(circuit_json).map_err(|e| JsError::new(&e.to_string()))?;
     let output = simulate_to_output_json(circuit, ticks);
-    output_json_to_string(&output).map_err(|e| JsError::new(&e))
+    output_json_to_string(&output).map_err(|e| JsError::new(&e.to_string()))
 }
 
 #[cfg(test)]
