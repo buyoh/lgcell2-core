@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::base::SimulationError;
 use crate::circuit::{Circuit, Pos};
 
 /// 各セルの現在値を保持する。
@@ -26,12 +27,12 @@ impl SimState {
     }
 
     /// 指定座標の値を更新する。
-    pub fn set(&mut self, pos: Pos, value: bool) -> Result<(), String> {
+    pub fn set(&mut self, pos: Pos, value: bool) -> Result<(), SimulationError> {
         if let Some(entry) = self.values.get_mut(&pos) {
             *entry = value;
             Ok(())
         } else {
-            Err(format!("unknown cell at ({}, {})", pos.x, pos.y))
+            Err(SimulationError::UnknownCell(pos))
         }
     }
 

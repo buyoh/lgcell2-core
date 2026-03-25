@@ -38,5 +38,5 @@ fn set_rejects_unknown_cell() {
         .set(Pos::new(9, 9), true)
         .expect_err("unknown position must fail");
 
-    assert!(err.contains("unknown cell"));
+    assert!(matches!(err, crate::base::SimulationError::UnknownCell(Pos { x: 9, y: 9 })));
 }

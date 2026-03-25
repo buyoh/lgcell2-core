@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
+use lgcell2_core::base::ParseError;
 use lgcell2_core::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 use lgcell2_core::io::json::CircuitJson;
 use lgcell2_core::simulation::Simulator;
@@ -94,7 +95,7 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
 fn build_circuit_with_case_generators(
     circuit_json: &CircuitJson,
     case_generators: &[GeneratorJson],
-) -> Result<Circuit, String> {
+) -> Result<Circuit, ParseError> {
     let mut cells = BTreeSet::new();
     let mut wires = Vec::with_capacity(circuit_json.wires.len());
 
@@ -123,27 +124,27 @@ fn build_circuit_with_case_generators(
     }
 
     let generators = generators_by_target.into_values().collect::<Vec<_>>();
-    Circuit::with_generators(cells, wires, generators)
+    Circuit::with_generators(cells, wires, generators).map_err(ParseError::from)
 }
 
-fn parse_wire_kind(kind: &str) -> Result<WireKind, String> {
+fn parse_wire_kind(kind: &str) -> Result<WireKind, ParseError> {
     match kind {
         "positive" => Ok(WireKind::Positive),
         "negative" => Ok(WireKind::Negative),
-        _ => Err(format!("wire kind must be positive or negative: {}", kind)),
+        _ => Err(ParseError::InvalidWireKind(kind.to_string())),
     }
 }
 
-fn parse_pattern(pattern: &str) -> Result<Vec<bool>, String> {
+fn parse_pattern(pattern: &str) -> Result<Vec<bool>, ParseError> {
     pattern
         .chars()
         .map(|c| match c {
             '1' => Ok(true),
             '0' => Ok(false),
-            _ => Err(format!(
+            _ => Err(ParseError::InvalidWireKind(format!(
                 "invalid pattern character: '{}' (expected '0' or '1')",
                 c
-            )),
+            ))),
         })
         .collect()
 }
@@ -180,10 +181,11 @@ pub fn test_validation_case(test_dir: &str) {
         "Circuit in {} should be rejected, but was accepted",
         test_dir
     ));
+    let err_msg = err.to_string();
     assert!(
-        err.contains(&expected.error_contains),
+        err_msg.contains(&expected.error_contains),
         "Error message '{}' does not contain expected substring '{}'",
-        err,
+        err_msg,
         expected.error_contains
     );
 }

@@ -1,5 +1,6 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
+use crate::base::CircuitError;
 use crate::circuit::{Generator, Pos, Wire};
 
 /// 回路の構造定義。構築後は不変。
@@ -20,7 +21,7 @@ pub struct Circuit {
 
 impl Circuit {
     /// ジェネレーターなしで回路を構築する（既存互換）。
-    pub fn new(cells: BTreeSet<Pos>, wires: Vec<Wire>) -> Result<Self, String> {
+    pub fn new(cells: BTreeSet<Pos>, wires: Vec<Wire>) -> Result<Self, CircuitError> {
         Self::with_generators(cells, wires, Vec::new())
     }
 
@@ -29,36 +30,30 @@ impl Circuit {
         mut cells: BTreeSet<Pos>,
         wires: Vec<Wire>,
         generators: Vec<Generator>,
-    ) -> Result<Self, String> {
+    ) -> Result<Self, CircuitError> {
         let mut seen_pairs: HashSet<(Pos, Pos)> = HashSet::new();
 
         for wire in &wires {
             if wire.src == wire.dst {
-                return Err(format!(
-                    "self-loop wire is not allowed: src=({}, {}), dst=({}, {})",
-                    wire.src.x, wire.src.y, wire.dst.x, wire.dst.y
-                ));
+                return Err(CircuitError::SelfLoop {
+                    src: wire.src,
+                    dst: wire.dst,
+                });
             }
 
             if !cells.contains(&wire.src) {
-                return Err(format!(
-                    "wire src does not exist in cells: ({}, {})",
-                    wire.src.x, wire.src.y
-                ));
+                return Err(CircuitError::WireSrcNotFound(wire.src));
             }
 
             if !cells.contains(&wire.dst) {
-                return Err(format!(
-                    "wire dst does not exist in cells: ({}, {})",
-                    wire.dst.x, wire.dst.y
-                ));
+                return Err(CircuitError::WireDstNotFound(wire.dst));
             }
 
             if !seen_pairs.insert((wire.src, wire.dst)) {
-                return Err(format!(
-                    "duplicate wire is not allowed: src=({}, {}), dst=({}, {})",
-                    wire.src.x, wire.src.y, wire.dst.x, wire.dst.y
-                ));
+                return Err(CircuitError::DuplicateWire {
+                    src: wire.src,
+                    dst: wire.dst,
+                });
             }
         }
 
@@ -74,26 +69,20 @@ impl Circuit {
                 .map(|v| !v.is_empty())
                 .unwrap_or(false)
             {
-                return Err(format!(
-                    "generator target ({},{}) must not have incoming wires",
-                    generator.target().x,
-                    generator.target().y
+                return Err(CircuitError::GeneratorTargetHasIncomingWires(
+                    generator.target(),
                 ));
             }
 
             if !generator_targets.insert(generator.target()) {
-                return Err(format!(
-                    "duplicate generator target is not allowed: ({},{})",
-                    generator.target().x,
-                    generator.target().y
+                return Err(CircuitError::DuplicateGeneratorTarget(
+                    generator.target(),
                 ));
             }
 
             if generator.pattern().is_empty() {
-                return Err(format!(
-                    "generator pattern must not be empty: ({},{})",
-                    generator.target().x,
-                    generator.target().y
+                return Err(CircuitError::EmptyGeneratorPattern(
+                    generator.target(),
                 ));
             }
 

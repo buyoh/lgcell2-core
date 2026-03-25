@@ -32,7 +32,7 @@ fn parse_rejects_invalid_kind() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject unknown kind");
-    assert!(err.contains("wire kind must be positive or negative"));
+    assert!(matches!(err, crate::base::ParseError::InvalidWireKind(ref kind) if kind == "unknown"));
 }
 
 #[test]
@@ -46,7 +46,7 @@ fn parse_rejects_self_loop() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject self-loop");
-    assert!(err.contains("self-loop wire is not allowed"));
+    assert!(matches!(err, crate::base::ParseError::Circuit(crate::base::CircuitError::SelfLoop { src: crate::circuit::Pos { x: 0, y: 0 }, dst: crate::circuit::Pos { x: 0, y: 0 } })));
 }
 
 #[test]
@@ -61,7 +61,7 @@ fn parse_rejects_duplicate_wires() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject duplicate wires");
-    assert!(err.contains("duplicate wire is not allowed"));
+    assert!(matches!(err, crate::base::ParseError::Circuit(crate::base::CircuitError::DuplicateWire { src: crate::circuit::Pos { x: 0, y: 0 }, dst: crate::circuit::Pos { x: 1, y: 0 } })));
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn parse_rejects_invalid_generator_pattern_char() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject invalid pattern character");
-    assert!(err.contains("invalid pattern character"));
+    assert!(matches!(err, crate::base::ParseError::InvalidWireKind(ref msg) if msg.contains("invalid pattern character")));
 }
 
 #[test]

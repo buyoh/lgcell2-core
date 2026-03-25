@@ -17,19 +17,17 @@ struct Cli {
     ticks: u64,
 }
 
-fn read_input(file: Option<PathBuf>) -> Result<String, String> {
+fn read_input(file: Option<PathBuf>) -> Result<String, std::io::Error> {
     if let Some(path) = file {
-        fs::read_to_string(path).map_err(|err| err.to_string())
+        fs::read_to_string(path)
     } else {
         let mut buf = String::new();
-        io::stdin()
-            .read_to_string(&mut buf)
-            .map_err(|err| err.to_string())?;
+        io::stdin().read_to_string(&mut buf)?;
         Ok(buf)
     }
 }
 
-fn run() -> Result<(), String> {
+fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
     let input = read_input(cli.file)?;
     let circuit = parse_circuit_json(&input)?;

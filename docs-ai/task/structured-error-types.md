@@ -3,7 +3,7 @@
 全モジュールのエラーハンドリングで `String` を使用している問題を解決する。
 
 作成日: 2026-03-23
-ステータス: 設計完了（未実装）
+ステータス: **実装完了** (2026-03-25)
 
 ## 背景・動機
 
@@ -139,3 +139,37 @@ pub fn output_json_to_string(output: &SimulationOutputJson) -> Result<String, se
 6. `src/bin/lgcell2/main.rs`: `read_input()` を `Result<String, std::io::Error>` に、`run()` を `Result<(), Box<dyn std::error::Error>>` に変更
 7. 全テストファイルのアサーションをパターンマッチに書き換え
 8. `tests/circuit_tests.rs`（統合テスト）のエラーアサーションを更新
+
+## 実装ノート
+
+### 実装完了内容
+
+全ての設計ステップが完了し、以下のモジュールが構造化エラー型に移行された：
+
+- **src/base/error.rs**: CircuitError, ParseError, SimulationError を定義
+  - CircuitError には設計で定義された4つのバリアント (SelfLoop, WireSrcNotFound, WireDstNotFound, DuplicateWire) に加えて、ジェネレーター検証エラー3つを追加（GeneratorTargetHasIncomingWires, DuplicateGeneratorTarget, EmptyGeneratorPattern）
+  - ParseError は設計通り InvalidWireKind, Json, Circuit を定義
+
+- **src/circuit/circuit.rs**: CircuitError に移行
+- **src/io/json.rs**: ParseError に移行
+- **src/simulation/state.rs, engine.rs**: SimulationError に移行
+- **src/bin/lgcell2/main.rs**: Result<String, std::io::Error>, Result<(), Box<dyn std::error::Error>> に移行
+
+### テスト更新
+
+全テストファイル (circuit_tests.rs, json_tests.rs, state_tests.rs, tests/test_helpers.rs) のアサーションをパターンマッチングに書き換えた：
+
+- 従来の `.contains()` を `matches!()` マクロでの構造化エラーマッチングに変更
+- Display トレイトの出力は設計通り維持され、エラーメッセージの互換性を確保
+
+### 追加実装
+
+設計には含まれなかったが、既存コードに含まれていたジェネレーター検証エラー3つを CircuitError に追加した。これらはlogically circuit validation エラーであり、CircuitError の適切なバリアントである。
+
+### テスト結果
+
+- ユニットテスト: 37 passed
+- 統合テスト: 47 passed  
+- 合計: 84 テスト全て成功
+
+エラーメッセージの互換性が保たれ、既存の Display 出力と一致することを確認。

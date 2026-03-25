@@ -2,6 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::base::ParseError;
 use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 use crate::simulation::Simulator;
 
@@ -44,7 +45,7 @@ pub struct TickStateJson {
 }
 
 impl TryFrom<CircuitJson> for Circuit {
-    type Error = String;
+    type Error = ParseError;
 
     fn try_from(value: CircuitJson) -> Result<Self, Self::Error> {
         let mut cells = BTreeSet::new();
@@ -56,7 +57,7 @@ impl TryFrom<CircuitJson> for Circuit {
             let kind = match wire.kind.as_str() {
                 "positive" => WireKind::Positive,
                 "negative" => WireKind::Negative,
-                _ => return Err(format!("wire kind must be positive or negative: {}", wire.kind)),
+                _ => return Err(ParseError::InvalidWireKind(wire.kind)),
             };
 
             cells.insert(src);
@@ -71,27 +72,27 @@ impl TryFrom<CircuitJson> for Circuit {
             generators.push(Generator::new(target, pattern, generator.is_loop));
         }
 
-        Circuit::with_generators(cells, wires, generators)
+        Circuit::with_generators(cells, wires, generators).map_err(ParseError::from)
     }
 }
 
-fn parse_pattern(pattern: &str) -> Result<Vec<bool>, String> {
+fn parse_pattern(pattern: &str) -> Result<Vec<bool>, ParseError> {
     pattern
         .chars()
         .map(|c| match c {
             '1' => Ok(true),
             '0' => Ok(false),
-            _ => Err(format!(
+            _ => Err(ParseError::InvalidWireKind(format!(
                 "invalid pattern character: '{}' (expected '0' or '1')",
                 c
-            )),
+            ))),
         })
         .collect()
 }
 
 /// 文字列 JSON から回路を読み込む。
-pub fn parse_circuit_json(input: &str) -> Result<Circuit, String> {
-    let parsed = serde_json::from_str::<CircuitJson>(input).map_err(|err| err.to_string())?;
+pub fn parse_circuit_json(input: &str) -> Result<Circuit, ParseError> {
+    let parsed = serde_json::from_str::<CircuitJson>(input)?;
     Circuit::try_from(parsed)
 }
 
@@ -117,8 +118,8 @@ pub fn simulate_to_output_json(circuit: Circuit, ticks: u64) -> SimulationOutput
 }
 
 /// シミュレーション結果 JSON を文字列に変換する。
-pub fn output_json_to_string(output: &SimulationOutputJson) -> Result<String, String> {
-    serde_json::to_string_pretty(output).map_err(|err| err.to_string())
+pub fn output_json_to_string(output: &SimulationOutputJson) -> Result<String, serde_json::Error> {
+    serde_json::to_string_pretty(output)
 }
 
 #[cfg(test)]

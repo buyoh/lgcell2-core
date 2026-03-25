@@ -1,3 +1,4 @@
+use crate::base::SimulationError;
 use crate::circuit::{Circuit, Pos};
 use crate::simulation::state::SimState;
 
@@ -25,7 +26,7 @@ pub struct StateMut<'a> {
 
 impl StateMut<'_> {
     /// 指定座標の値を prev_state と curr_state の両方で更新する。
-    pub fn set(&mut self, pos: Pos, value: bool) -> Result<(), String> {
+    pub fn set(&mut self, pos: Pos, value: bool) -> Result<(), SimulationError> {
         self.prev_state.set(pos, value)?;
         self.curr_state.set(pos, value)?;
         Ok(())
