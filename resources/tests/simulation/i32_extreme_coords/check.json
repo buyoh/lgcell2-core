@@ -1,0 +1,20 @@
+{
+  "ticks": 1,
+  "cases": [
+    {
+      "name": "all_false_input",
+      "expected": {
+        "2147483647,0": true,
+        "-2147483647,0": true
+      }
+    },
+    {
+      "name": "max_set",
+      "initial": { "2147483646,0": true },
+      "expected": {
+        "2147483647,0": false,
+        "-2147483647,0": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "ticks": 4,
+  "cases": [
+    {
+      "name": "set_then_hold",
+      "comment": "S=1 で set → S=0 で hold。Q=1 を維持",
+      "generators": [
+        { "target": [0, 0], "pattern": "0000" },
+        { "target": [0, 1], "pattern": "1000" }
+      ],
+      "expected": { "2,0": true, "2,1": false }
+    }
+  ]
+}
+

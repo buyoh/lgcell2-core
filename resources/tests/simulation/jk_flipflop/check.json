@@ -1,0 +1,26 @@
+{
+  "ticks": 6,
+  "cases": [
+    {
+      "name": "set",
+      "comment": "J=1, K=0, CLK=1 → Q=1",
+      "generators": [
+        { "target": [0, 0], "pattern": "111000" },
+        { "target": [0, 1], "pattern": "000000" },
+        { "target": [0, 2], "pattern": "111000" }
+      ],
+      "expected": { "2,0": true, "2,1": false }
+    },
+    {
+      "name": "reset",
+      "comment": "まず set してから、J=0, K=1, CLK=1 で reset → Q=0",
+      "generators": [
+        { "target": [0, 0], "pattern": "11100000" },
+        { "target": [0, 1], "pattern": "00011100" },
+        { "target": [0, 2], "pattern": "11111100" }
+      ],
+      "ticks": 8,
+      "expected": { "2,0": false, "2,1": true }
+    }
+  ]
+}

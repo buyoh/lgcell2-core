@@ -1,0 +1,13 @@
+{
+  "wires": [
+    { "src": [0, 0], "dst": [5, 5], "kind": "positive" },
+    { "src": [5, 5], "dst": [6, 5], "kind": "positive" },
+    { "src": [5, 5], "dst": [5, 6], "kind": "positive" },
+    { "src": [5, 5], "dst": [6, 6], "kind": "positive" },
+    { "src": [5, 5], "dst": [6, 4], "kind": "positive" },
+    { "src": [5, 5], "dst": [4, 5], "kind": "positive" },
+    { "src": [5, 5], "dst": [5, 4], "kind": "positive" },
+    { "src": [5, 5], "dst": [4, 4], "kind": "positive" },
+    { "src": [5, 5], "dst": [4, 6], "kind": "positive" }
+  ]
+}

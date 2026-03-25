@@ -1,0 +1,9 @@
+{
+  "ticks": 1,
+  "cases": [
+    { "name": "0_0", "initial": {}, "expected": { "2,0": true } },
+    { "name": "0_1", "initial": { "1,0": true }, "expected": { "2,0": false } },
+    { "name": "1_0", "initial": { "0,0": true }, "expected": { "2,0": true } },
+    { "name": "1_1", "initial": { "0,0": true, "1,0": true }, "expected": { "2,0": true } }
+  ]
+}

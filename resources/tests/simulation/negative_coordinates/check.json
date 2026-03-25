@@ -1,0 +1,9 @@
+{
+  "ticks": 1,
+  "cases": [
+    { "name": "0_xor_0", "expected": { "-1,0": false } },
+    { "name": "0_xor_1", "initial": { "-4,1": true }, "expected": { "-1,0": true } },
+    { "name": "1_xor_0", "initial": { "-4,0": true }, "expected": { "-1,0": true } },
+    { "name": "1_xor_1", "initial": { "-4,0": true, "-4,1": true }, "expected": { "-1,0": false } }
+  ]
+}

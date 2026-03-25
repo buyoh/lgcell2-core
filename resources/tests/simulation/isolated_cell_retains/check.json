@@ -1,0 +1,17 @@
+{
+  "ticks": 1,
+  "cases": [
+    {
+      "name": "retains_true",
+      "ticks": 3,
+      "initial": { "0,0": true },
+      "expected": { "0,0": true, "1,0": true }
+    },
+    {
+      "name": "retains_false",
+      "ticks": 3,
+      "initial": {},
+      "expected": { "0,0": false, "1,0": false }
+    }
+  ]
+}

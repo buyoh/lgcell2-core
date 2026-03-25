@@ -7,23 +7,87 @@ tests:
     type: simulation
     path: simulation/generator_pattern
     comment: "ジェネレーターのパターン適用と case override"
+
+  # === 機能テスト ===
+  - name: eight_directions
+    type: simulation
+    path: simulation/eight_directions
+    comment: "8方向ワイヤの即時伝搬・遅延伝搬の確認"
+
+  - name: feedback_oscillator
+    type: simulation
+    path: simulation/feedback_oscillator
+    comment: "3セルNOTリングの周期2振動"
+
+  - name: mixed_polarity_fan_in
+    type: simulation
+    path: simulation/mixed_polarity_fan_in
+    comment: "正負混合ワイヤの OR 合成"
+
+  - name: isolated_cell_retains
+    type: simulation
+    path: simulation/isolated_cell_retains
+    comment: "入力なしセルの値保持"
+
+  # === 境界テスト ===
+  - name: i32_extreme_coords
+    type: simulation
+    path: simulation/i32_extreme_coords
+    comment: "i32 極値付近の座標での動作確認"
+
+  - name: negative_coordinates
+    type: simulation
+    path: simulation/negative_coordinates
+    comment: "全負座標の回路"
+
+  # === 失敗テスト ===
   - name: validation_self_loop
     type: validation
     path: validation/self_loop
     comment: "Self-loop wire is rejected"
+
+  - name: validation_duplicate_wire_same_kind
+    type: validation
+    path: validation/duplicate_wire_same_kind
+    comment: "同種多重辺を拒否"
+
+  - name: validation_duplicate_wire_diff_kind
+    type: validation
+    path: validation/duplicate_wire_diff_kind
+    comment: "異種多重辺を拒否"
+
+  - name: validation_unknown_wire_kind
+    type: validation
+    path: validation/unknown_wire_kind
+    comment: "不正な kind 文字列を拒否"
+
   - name: validation_generator_incoming
     type: validation
     path: validation/generator_incoming
     comment: "Generator target with incoming wire is rejected"
+
   - name: validation_generator_duplicate_target
     type: validation
     path: validation/generator_duplicate_target
     comment: "Duplicate generator target is rejected"
+
   - name: validation_generator_empty_pattern
     type: validation
     path: validation/generator_empty_pattern
     comment: "Empty generator pattern is rejected"
+
   - name: validation_generator_invalid_pattern_char
     type: validation
     path: validation/generator_invalid_pattern_char
     comment: "Invalid generator pattern character is rejected"
+
+  # === 総合テスト ===
+  - name: sr_latch
+    type: simulation
+    path: simulation/sr_latch
+    comment: "NOR SR ラッチの set/hold 動作"
+
+  - name: jk_flipflop
+    type: simulation
+    path: simulation/jk_flipflop
+    comment: "JK フリップフロップの動作確認"

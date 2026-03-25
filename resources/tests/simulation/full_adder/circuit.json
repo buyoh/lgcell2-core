@@ -1,0 +1,22 @@
+{
+  "wires": [
+    { "src": [0, 0], "dst": [1, 0], "kind": "positive" },
+    { "src": [0, 1], "dst": [1, 0], "kind": "positive" },
+    { "src": [0, 0], "dst": [1, 1], "kind": "negative" },
+    { "src": [0, 1], "dst": [1, 1], "kind": "negative" },
+    { "src": [1, 0], "dst": [1, 2], "kind": "negative" },
+    { "src": [1, 1], "dst": [1, 2], "kind": "negative" },
+    { "src": [1, 2], "dst": [2, 0], "kind": "positive" },
+    { "src": [0, 2], "dst": [2, 0], "kind": "positive" },
+    { "src": [1, 2], "dst": [2, 1], "kind": "negative" },
+    { "src": [0, 2], "dst": [2, 1], "kind": "negative" },
+    { "src": [2, 0], "dst": [2, 2], "kind": "negative" },
+    { "src": [2, 1], "dst": [2, 2], "kind": "negative" },
+    { "src": [0, 0], "dst": [3, 0], "kind": "positive" },
+    { "src": [0, 1], "dst": [3, 0], "kind": "positive" },
+    { "src": [1, 2], "dst": [3, 1], "kind": "positive" },
+    { "src": [0, 2], "dst": [3, 1], "kind": "positive" },
+    { "src": [3, 0], "dst": [3, 2], "kind": "positive" },
+    { "src": [3, 1], "dst": [3, 2], "kind": "positive" }
+  ]
+}
