@@ -126,7 +126,7 @@ pub fn value_at(&self, tick: u64) -> bool {
 
 ---
 
-## 4. Pos に Display トレイトが未実装で手動フォーマットが分散している
+## ~~4. Pos に Display トレイトが未実装で手動フォーマットが分散している~~ (対応済み)
 
 重要度: **low**
 

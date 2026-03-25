@@ -1,25 +1,25 @@
 /// Errors that occur during circuit structure validation.
 #[derive(Debug, thiserror::Error)]
 pub enum CircuitError {
-    #[error("self-loop wire is not allowed: src=({}, {}), dst=({}, {})", .src.x, .src.y, .dst.x, .dst.y)]
+    #[error("self-loop wire is not allowed: src={}, dst={}", .src, .dst)]
     SelfLoop { src: crate::circuit::Pos, dst: crate::circuit::Pos },
 
-    #[error("wire src does not exist in cells: ({}, {})", .0.x, .0.y)]
+    #[error("wire src does not exist in cells: {0}")]
     WireSrcNotFound(crate::circuit::Pos),
 
-    #[error("wire dst does not exist in cells: ({}, {})", .0.x, .0.y)]
+    #[error("wire dst does not exist in cells: {0}")]
     WireDstNotFound(crate::circuit::Pos),
 
-    #[error("duplicate wire is not allowed: src=({}, {}), dst=({}, {})", .src.x, .src.y, .dst.x, .dst.y)]
+    #[error("duplicate wire is not allowed: src={}, dst={}", .src, .dst)]
     DuplicateWire { src: crate::circuit::Pos, dst: crate::circuit::Pos },
 
-    #[error("generator target ({}, {}) must not have incoming wires", .0.x, .0.y)]
+    #[error("generator target {0} must not have incoming wires")]
     GeneratorTargetHasIncomingWires(crate::circuit::Pos),
 
-    #[error("duplicate generator target is not allowed: ({}, {})", .0.x, .0.y)]
+    #[error("duplicate generator target is not allowed: {0}")]
     DuplicateGeneratorTarget(crate::circuit::Pos),
 
-    #[error("generator pattern must not be empty: ({}, {})", .0.x, .0.y)]
+    #[error("generator pattern must not be empty: {0}")]
     EmptyGeneratorPattern(crate::circuit::Pos),
 }
 
@@ -39,6 +39,6 @@ pub enum ParseError {
 /// Errors that occur during simulation execution.
 #[derive(Debug, thiserror::Error)]
 pub enum SimulationError {
-    #[error("unknown cell at ({}, {})", .0.x, .0.y)]
+    #[error("unknown cell at {0}")]
     UnknownCell(crate::circuit::Pos),
 }

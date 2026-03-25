@@ -12,6 +12,12 @@ impl Pos {
     }
 }
 
+impl std::fmt::Display for Pos {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "({}, {})", self.x, self.y)
+    }
+}
+
 #[cfg(test)]
 #[path = "pos_tests.rs"]
 mod pos_tests;

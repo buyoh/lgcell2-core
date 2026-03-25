@@ -105,7 +105,7 @@ pub fn simulate_to_output_json(circuit: Circuit, ticks: u64) -> SimulationOutput
     for snapshot in snapshots {
         let mut cells = BTreeMap::new();
         for (pos, value) in snapshot.cells {
-            cells.insert(format!("{},{}", pos.x, pos.y), u8::from(value));
+            cells.insert(pos_to_json_key(pos), u8::from(value));
         }
 
         results.push(TickStateJson {
@@ -115,6 +115,11 @@ pub fn simulate_to_output_json(circuit: Circuit, ticks: u64) -> SimulationOutput
     }
 
     SimulationOutputJson { ticks: results }
+}
+
+/// Pos を JSON キー形式 (`"x,y"`) に変換する。
+fn pos_to_json_key(pos: Pos) -> String {
+    format!("{},{}", pos.x, pos.y)
 }
 
 /// シミュレーション結果 JSON を文字列に変換する。
