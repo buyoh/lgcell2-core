@@ -3,7 +3,7 @@
 expand-test-manifest で追加したテストのうち、3件が失敗または除外されている。回路設計・ジェネレーターパターンを修正してテストを通す。
 
 作成日: 2026-03-25
-ステータス: 未着手
+ステータス: 完了
 
 ## 背景・動機
 
@@ -78,7 +78,14 @@ Mismatch at 2,0 in test case bit1_toggles_on_bit0_change: expected true, got fal
 
 ## ステップ
 
-1. sr_latch の状態遷移トレースを行い、set_then_reset のジェネレーターパターンを修正する
-2. full_adder の回路を AND=NOT(NAND) で再設計し、circuit.json と check.json を修正する
-3. two_bit_counter の動作を分析し、適切な回路設計またはテストケースの差し替えを行う
-4. 修正したテストをマニフェストに復帰（コメントアウト解除）し、全テスト PASS を確認する
+1. ✅ sr_latch の状態遷移トレースを行い、set_then_reset のジェネレーターパターンを修正する
+   - 原因: backward フィードバックワイヤの遅延により、R=1 が 1 tick では不十分。R を 2 tick 保持することで安定化
+   - パターン変更: R="001000"→"0011000"（tick 2-3 で reset）、ticks=6→7
+2. ✅ full_adder の回路を AND=NOT(NAND) で再設計し、circuit.json と check.json を修正する
+   - 構成: OR→NAND→NOT(NAND)=AND、XOR=AND(OR,NAND)
+   - 中間セル追加により全 forward ワイヤでの 1 tick 完結を実現（出力: (6,0)=sum, (6,1)=carry）
+3. ✅ two_bit_counter → shift_register に差し替え
+   - リプルカウンタは level-triggered モデルでは実現不可（bit0 と bit1 が同期して振動するだけ）
+   - 代替: 2 段シフトレジスタ（backward ワイヤによる 1 tick 遅延 × 2 段）
+4. ✅ 修正したテストをマニフェストに復帰（コメントアウト解除）し、全テスト PASS を確認する
+   - 全 47 テスト PASS

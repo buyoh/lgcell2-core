@@ -12,12 +12,12 @@
     },
     {
       "name": "set_then_reset",
-      "comment": "S=1 で set → R=1 で reset。Q=0。フィードバック遅延の安定化に十分な tick が必要",
+      "comment": "S=1 で set → R=1(2 tick) で reset。Q=0。backward フィードバック遅延の安定化に2 tick のリセットパルスが必要",
       "generators": [
-        { "target": [0, 0], "pattern": "001000" },
-        { "target": [0, 1], "pattern": "100000" }
+        { "target": [0, 0], "pattern": "0011000" },
+        { "target": [0, 1], "pattern": "1000000" }
       ],
-      "ticks": 6,
+      "ticks": 7,
       "expected": { "2,0": false, "2,1": true }
     }
   ]
