@@ -91,3 +91,17 @@ tests:
     type: simulation
     path: simulation/jk_flipflop
     comment: "JK フリップフロップの動作確認"
+
+  # --- 以下は未解決の回路設計問題により無効化 ---
+  # full_adder: AND ゲートが LGCELL2 の OR 合成モデルで実装不可
+  # see: docs-ai/done-task/expand-test-manifest/expand-test-manifest/investigation/full-adder-limitation.md
+  # - name: full_adder
+  #   type: simulation
+  #   path: simulation/full_adder
+  #   comment: "全加算器の真理値表テスト"
+
+  # two_bit_counter: リプルカウンタのエッジ検出が LGCELL2 のレベルトリガモデルで困難
+  # - name: two_bit_counter
+  #   type: simulation
+  #   path: simulation/two_bit_counter
+  #   comment: "2ビットカウンタ"
