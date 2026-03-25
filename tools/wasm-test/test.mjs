@@ -21,8 +21,9 @@ if (wasmInstance.exports.__wbindgen_start) {
   wasmInstance.exports.__wbindgen_start();
 }
 
-const { simulate } = bg;
+const { simulate, simulate_n } = bg;
 
+// simulate (BigInt)
 {
   const circuit = JSON.stringify({
     wires: [{ src: [0, 0], dst: [1, 0], kind: "positive" }],
@@ -33,7 +34,21 @@ const { simulate } = bg;
 
   assert.ok(Array.isArray(parsed.ticks), "ticks is array");
   assert.equal(parsed.ticks.length, 3, "3 ticks");
-  console.log("PASS: basic simulation");
+  console.log("PASS: simulate (BigInt)");
+}
+
+// simulate_n (number)
+{
+  const circuit = JSON.stringify({
+    wires: [{ src: [0, 0], dst: [1, 0], kind: "positive" }],
+  });
+
+  const result = simulate_n(circuit, 3);
+  const parsed = JSON.parse(result);
+
+  assert.ok(Array.isArray(parsed.ticks), "ticks is array");
+  assert.equal(parsed.ticks.length, 3, "3 ticks");
+  console.log("PASS: simulate_n (number)");
 }
 
 {
