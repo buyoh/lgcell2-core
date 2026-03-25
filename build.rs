@@ -29,7 +29,8 @@ fn main() {
 
 fn generate_tests() {
     let manifest_path = "resources/tests/test-manifest.yaml";
-    let manifest_content = fs::read_to_string(manifest_path).expect("Failed to read test-manifest.yaml");
+    let manifest_content =
+        fs::read_to_string(manifest_path).expect("Failed to read test-manifest.yaml");
 
     let manifest: TestManifest =
         serde_yaml::from_str(&manifest_content).expect("Failed to parse test-manifest.yaml");
@@ -58,8 +59,8 @@ fn write_simulation_tests(f: &mut fs::File, test: &TestCase) {
 
     // resources/tests/{path}/check.json を読み込んでケース名を抽出
     let check_path = format!("resources/tests/{}/check.json", test.path);
-    let check_content = fs::read_to_string(&check_path)
-        .unwrap_or_else(|_| panic!("Failed to read {}", check_path));
+    let check_content =
+        fs::read_to_string(&check_path).unwrap_or_else(|_| panic!("Failed to read {}", check_path));
 
     #[derive(Deserialize)]
     struct CheckFile {

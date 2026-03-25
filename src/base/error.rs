@@ -2,7 +2,10 @@
 #[derive(Debug, thiserror::Error)]
 pub enum CircuitError {
     #[error("self-loop wire is not allowed: src={}, dst={}", .src, .dst)]
-    SelfLoop { src: crate::circuit::Pos, dst: crate::circuit::Pos },
+    SelfLoop {
+        src: crate::circuit::Pos,
+        dst: crate::circuit::Pos,
+    },
 
     #[error("wire src does not exist in cells: {0}")]
     WireSrcNotFound(crate::circuit::Pos),
@@ -11,7 +14,10 @@ pub enum CircuitError {
     WireDstNotFound(crate::circuit::Pos),
 
     #[error("duplicate wire is not allowed: src={}, dst={}", .src, .dst)]
-    DuplicateWire { src: crate::circuit::Pos, dst: crate::circuit::Pos },
+    DuplicateWire {
+        src: crate::circuit::Pos,
+        dst: crate::circuit::Pos,
+    },
 
     #[error("generator target {0} must not have incoming wires")]
     GeneratorTargetHasIncomingWires(crate::circuit::Pos),

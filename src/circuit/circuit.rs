@@ -75,15 +75,11 @@ impl Circuit {
             }
 
             if !generator_targets.insert(generator.target()) {
-                return Err(CircuitError::DuplicateGeneratorTarget(
-                    generator.target(),
-                ));
+                return Err(CircuitError::DuplicateGeneratorTarget(generator.target()));
             }
 
             if generator.pattern().is_empty() {
-                return Err(CircuitError::EmptyGeneratorPattern(
-                    generator.target(),
-                ));
+                return Err(CircuitError::EmptyGeneratorPattern(generator.target()));
             }
 
             cells.insert(generator.target());
@@ -122,10 +118,7 @@ impl Circuit {
 
     /// 指定セルに入るワイヤインデックス一覧を返す。
     pub fn incoming_indices(&self, dst: Pos) -> &[usize] {
-        self.incoming
-            .get(&dst)
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
+        self.incoming.get(&dst).map(Vec::as_slice).unwrap_or(&[])
     }
 }
 

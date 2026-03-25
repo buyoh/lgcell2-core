@@ -3,11 +3,7 @@ use std::collections::BTreeSet;
 use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 
 fn sample_cells() -> BTreeSet<Pos> {
-    BTreeSet::from([
-        Pos::new(0, 0),
-        Pos::new(1, 0),
-        Pos::new(2, 0),
-    ])
+    BTreeSet::from([Pos::new(0, 0), Pos::new(1, 0), Pos::new(2, 0)])
 }
 
 #[test]
@@ -46,7 +42,10 @@ fn circuit_rejects_unknown_wire_endpoint() {
     )];
 
     let err = Circuit::new(cells, wires).expect_err("must reject unknown src");
-    assert!(matches!(err, crate::base::CircuitError::WireSrcNotFound(Pos { x: 9, y: 9 })));
+    assert!(matches!(
+        err,
+        crate::base::CircuitError::WireSrcNotFound(Pos { x: 9, y: 9 })
+    ));
 }
 
 #[test]
@@ -59,7 +58,13 @@ fn circuit_rejects_self_loop() {
     )];
 
     let err = Circuit::new(cells, wires).expect_err("must reject self-loop");
-    assert!(matches!(err, crate::base::CircuitError::SelfLoop { src: Pos { x: 1, y: 0 }, dst: Pos { x: 1, y: 0 } }));
+    assert!(matches!(
+        err,
+        crate::base::CircuitError::SelfLoop {
+            src: Pos { x: 1, y: 0 },
+            dst: Pos { x: 1, y: 0 }
+        }
+    ));
 }
 
 #[test]
@@ -71,7 +76,13 @@ fn circuit_rejects_duplicate_wire_same_kind() {
     ];
 
     let err = Circuit::new(cells, wires).expect_err("must reject duplicate wire");
-    assert!(matches!(err, crate::base::CircuitError::DuplicateWire { src: Pos { x: 0, y: 0 }, dst: Pos { x: 2, y: 0 } }));
+    assert!(matches!(
+        err,
+        crate::base::CircuitError::DuplicateWire {
+            src: Pos { x: 0, y: 0 },
+            dst: Pos { x: 2, y: 0 }
+        }
+    ));
 }
 
 #[test]
@@ -83,7 +94,13 @@ fn circuit_rejects_duplicate_wire_different_kind() {
     ];
 
     let err = Circuit::new(cells, wires).expect_err("must reject duplicate wire");
-    assert!(matches!(err, crate::base::CircuitError::DuplicateWire { src: Pos { x: 0, y: 0 }, dst: Pos { x: 2, y: 0 } }));
+    assert!(matches!(
+        err,
+        crate::base::CircuitError::DuplicateWire {
+            src: Pos { x: 0, y: 0 },
+            dst: Pos { x: 2, y: 0 }
+        }
+    ));
 }
 
 #[test]
@@ -108,7 +125,8 @@ fn circuit_with_generators_adds_targets_to_cells() {
     )];
     let generators = vec![Generator::new(Pos::new(9, 9), vec![true], false)];
 
-    let circuit = Circuit::with_generators(cells, wires, generators).expect("circuit must be valid");
+    let circuit =
+        Circuit::with_generators(cells, wires, generators).expect("circuit must be valid");
 
     assert!(circuit.cells().contains(&Pos::new(9, 9)));
     assert_eq!(circuit.generators().len(), 1);
@@ -126,7 +144,10 @@ fn circuit_rejects_generator_target_with_incoming_wire() {
 
     let err = Circuit::with_generators(cells, wires, generators)
         .expect_err("must reject generator on incoming target");
-    assert!(matches!(err, crate::base::CircuitError::GeneratorTargetHasIncomingWires(Pos { x: 2, y: 0 })));
+    assert!(matches!(
+        err,
+        crate::base::CircuitError::GeneratorTargetHasIncomingWires(Pos { x: 2, y: 0 })
+    ));
 }
 
 #[test]
@@ -144,7 +165,10 @@ fn circuit_rejects_duplicate_generator_target() {
 
     let err = Circuit::with_generators(cells, wires, generators)
         .expect_err("must reject duplicate generator target");
-    assert!(matches!(err, crate::base::CircuitError::DuplicateGeneratorTarget(Pos { x: 2, y: 0 })));
+    assert!(matches!(
+        err,
+        crate::base::CircuitError::DuplicateGeneratorTarget(Pos { x: 2, y: 0 })
+    ));
 }
 
 #[test]
@@ -159,5 +183,8 @@ fn circuit_rejects_empty_generator_pattern() {
 
     let err = Circuit::with_generators(cells, wires, generators)
         .expect_err("must reject empty generator pattern");
-    assert!(matches!(err, crate::base::CircuitError::EmptyGeneratorPattern(Pos { x: 2, y: 0 })));
+    assert!(matches!(
+        err,
+        crate::base::CircuitError::EmptyGeneratorPattern(Pos { x: 2, y: 0 })
+    ));
 }

@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use lgcell2_core::base::ParseError;
 use lgcell2_core::circuit::{Circuit, Generator, Pos, Wire};
-use lgcell2_core::io::json::{parse_pattern, parse_wire_kind, CircuitJson};
+use lgcell2_core::io::json::{CircuitJson, parse_pattern, parse_wire_kind};
 use lgcell2_core::simulation::Simulator;
 
 #[derive(serde::Deserialize)]
@@ -55,7 +55,12 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
         .cases
         .iter()
         .find(|c| c.name == case_name)
-        .unwrap_or_else(|| panic!("Test case '{}' not found in {}/check.json", case_name, test_dir));
+        .unwrap_or_else(|| {
+            panic!(
+                "Test case '{}' not found in {}/check.json",
+                case_name, test_dir
+            )
+        });
 
     // 3. circuit.json の generator と case.generator を target 単位でマージ
     let circuit = build_circuit_with_case_generators(&circuit_json, &test_case.generators)

@@ -7,19 +7,23 @@ fn make_circuit(cells: &[Pos], wires: Vec<Wire>) -> Circuit {
     Circuit::new(BTreeSet::from_iter(cells.iter().copied()), wires).expect("valid circuit")
 }
 
-fn make_circuit_with_generators(cells: &[Pos], wires: Vec<Wire>, generators: Vec<Generator>) -> Circuit {
-    Circuit::with_generators(BTreeSet::from_iter(cells.iter().copied()), wires, generators)
-        .expect("valid circuit")
+fn make_circuit_with_generators(
+    cells: &[Pos],
+    wires: Vec<Wire>,
+    generators: Vec<Generator>,
+) -> Circuit {
+    Circuit::with_generators(
+        BTreeSet::from_iter(cells.iter().copied()),
+        wires,
+        generators,
+    )
+    .expect("valid circuit")
 }
 
 #[test]
 fn positive_chain_propagates_within_one_tick() {
     let circuit = make_circuit(
-        &[
-            Pos::new(0, 0),
-            Pos::new(1, 0),
-            Pos::new(2, 0),
-        ],
+        &[Pos::new(0, 0), Pos::new(1, 0), Pos::new(2, 0)],
         vec![
             Wire::new(Pos::new(0, 0), Pos::new(1, 0), WireKind::Positive),
             Wire::new(Pos::new(1, 0), Pos::new(2, 0), WireKind::Positive),
@@ -54,11 +58,7 @@ fn backward_wire_is_delayed_by_one_tick() {
 #[test]
 fn nand_is_constructed_by_two_negative_wires() {
     let circuit = make_circuit(
-        &[
-            Pos::new(0, 0),
-            Pos::new(1, 0),
-            Pos::new(2, 0),
-        ],
+        &[Pos::new(0, 0), Pos::new(1, 0), Pos::new(2, 0)],
         vec![
             Wire::new(Pos::new(0, 0), Pos::new(2, 0), WireKind::Negative),
             Wire::new(Pos::new(1, 0), Pos::new(2, 0), WireKind::Negative),
@@ -74,11 +74,7 @@ fn nand_is_constructed_by_two_negative_wires() {
 #[test]
 fn step_can_pause_and_resume_without_behavior_change() {
     let circuit = make_circuit(
-        &[
-            Pos::new(0, 0),
-            Pos::new(1, 0),
-            Pos::new(2, 0),
-        ],
+        &[Pos::new(0, 0), Pos::new(1, 0), Pos::new(2, 0)],
         vec![
             Wire::new(Pos::new(0, 0), Pos::new(1, 0), WireKind::Positive),
             Wire::new(Pos::new(1, 0), Pos::new(2, 0), WireKind::Positive),

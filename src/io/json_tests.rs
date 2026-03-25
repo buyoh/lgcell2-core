@@ -1,5 +1,5 @@
 use crate::io::json::{
-    output_json_to_string, parse_circuit_json, simulate_to_output_json, CircuitJson,
+    CircuitJson, output_json_to_string, parse_circuit_json, simulate_to_output_json,
 };
 use crate::simulation::Simulator;
 
@@ -32,7 +32,9 @@ fn parse_rejects_invalid_kind() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject unknown kind");
-    assert!(matches!(err, crate::base::ParseError::Format(crate::base::FormatError::InvalidWireKind(ref kind)) if kind == "unknown"));
+    assert!(
+        matches!(err, crate::base::ParseError::Format(crate::base::FormatError::InvalidWireKind(ref kind)) if kind == "unknown")
+    );
 }
 
 #[test]
@@ -46,7 +48,13 @@ fn parse_rejects_self_loop() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject self-loop");
-    assert!(matches!(err, crate::base::ParseError::Circuit(crate::base::CircuitError::SelfLoop { src: crate::circuit::Pos { x: 0, y: 0 }, dst: crate::circuit::Pos { x: 0, y: 0 } })));
+    assert!(matches!(
+        err,
+        crate::base::ParseError::Circuit(crate::base::CircuitError::SelfLoop {
+            src: crate::circuit::Pos { x: 0, y: 0 },
+            dst: crate::circuit::Pos { x: 0, y: 0 }
+        })
+    ));
 }
 
 #[test]
@@ -61,7 +69,13 @@ fn parse_rejects_duplicate_wires() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject duplicate wires");
-    assert!(matches!(err, crate::base::ParseError::Circuit(crate::base::CircuitError::DuplicateWire { src: crate::circuit::Pos { x: 0, y: 0 }, dst: crate::circuit::Pos { x: 1, y: 0 } })));
+    assert!(matches!(
+        err,
+        crate::base::ParseError::Circuit(crate::base::CircuitError::DuplicateWire {
+            src: crate::circuit::Pos { x: 0, y: 0 },
+            dst: crate::circuit::Pos { x: 1, y: 0 }
+        })
+    ));
 }
 
 #[test]
@@ -129,7 +143,10 @@ fn parse_generators_and_apply_default_loop_false() {
 
     let circuit = parse_circuit_json(input).expect("json must parse");
     assert_eq!(circuit.generators().len(), 1);
-    assert_eq!(circuit.generators()[0].target(), crate::circuit::Pos::new(0, 0));
+    assert_eq!(
+        circuit.generators()[0].target(),
+        crate::circuit::Pos::new(0, 0)
+    );
     assert_eq!(circuit.generators()[0].pattern(), &[true, false]);
     assert!(!circuit.generators()[0].is_loop());
 }
@@ -148,7 +165,10 @@ fn parse_rejects_invalid_generator_pattern_char() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject invalid pattern character");
-    assert!(matches!(err, crate::base::ParseError::Format(crate::base::FormatError::InvalidPatternChar('x'))));
+    assert!(matches!(
+        err,
+        crate::base::ParseError::Format(crate::base::FormatError::InvalidPatternChar('x'))
+    ));
 }
 
 #[test]
@@ -174,12 +194,18 @@ fn parse_wire_kind_returns_format_error() {
 fn parse_pattern_returns_invalid_pattern_char_error() {
     use crate::io::json::parse_pattern;
     let err = parse_pattern("01a").expect_err("must reject invalid pattern char");
-    assert!(matches!(err, crate::base::FormatError::InvalidPatternChar('a')));
+    assert!(matches!(
+        err,
+        crate::base::FormatError::InvalidPatternChar('a')
+    ));
 }
 
 #[test]
 fn parse_pattern_returns_error_for_first_invalid_char() {
     use crate::io::json::parse_pattern;
     let err = parse_pattern("z10").expect_err("must reject invalid pattern char");
-    assert!(matches!(err, crate::base::FormatError::InvalidPatternChar('z')));
+    assert!(matches!(
+        err,
+        crate::base::FormatError::InvalidPatternChar('z')
+    ));
 }
