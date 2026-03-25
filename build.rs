@@ -42,7 +42,7 @@ fn generate_tests() {
     for test in manifest.tests {
         match test.test_type.as_str() {
             "simulation" => write_simulation_tests(&mut f, &test),
-            "validation" => write_validation_test(&mut f, &test),
+            "parse_error" => write_validation_test(&mut f, &test),
             _ => {
                 panic!("Unknown test type: {}", test.test_type);
             }
