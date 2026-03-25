@@ -1,7 +1,6 @@
 /target
 /local
-/target
-/local
 /.trash
 /pkg
 /pkg-dev
+/tmp
