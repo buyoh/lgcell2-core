@@ -33,7 +33,9 @@ impl ViewRenderer {
                 output.push(ch);
             }
             if row + 1 < rows {
-                output.push('\n');
+                // raw モードでは OPOST が無効なため、\n だけでは
+                // カーソルが列 0 に戻らない。\r\n を使用する。
+                output.push_str("\r\n");
             }
         }
 
@@ -80,7 +82,7 @@ impl ViewRenderer {
         if grid_rows == 0 {
             status
         } else {
-            format!("{grid}\n{status}")
+            format!("{grid}\r\n{status}")
         }
     }
 

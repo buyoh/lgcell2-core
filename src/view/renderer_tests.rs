@@ -29,7 +29,7 @@ fn render_grid_maps_symbols() {
 
     let grid = renderer.render_grid(&state, 2, 2);
 
-    assert_eq!(grid, "#_\n#.");
+    assert_eq!(grid, "#_\r\n#.");
 }
 
 #[test]
