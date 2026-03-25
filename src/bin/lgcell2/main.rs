@@ -5,6 +5,8 @@ use std::path::PathBuf;
 use clap::Parser;
 use lgcell2_core::io::json::{output_json_to_string, parse_circuit_json, simulate_to_output_json};
 
+mod view;
+
 /// LGCELL2 回路シミュレータ
 #[derive(Debug, Parser)]
 #[command(name = "lgcell2")]
@@ -13,8 +15,12 @@ struct Cli {
     file: Option<PathBuf>,
 
     /// シミュレーションする tick 数
-    #[arg(short, long, default_value_t = 100)]
-    ticks: u64,
+    #[arg(short, long)]
+    ticks: Option<u64>,
+
+    /// TUI ビューモードで実行
+    #[arg(short = 'v', long)]
+    view: bool,
 }
 
 fn read_input(file: Option<PathBuf>) -> Result<String, std::io::Error> {
@@ -29,11 +35,22 @@ fn read_input(file: Option<PathBuf>) -> Result<String, std::io::Error> {
 
 fn run() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
+    if cli.view && cli.ticks.is_some() {
+        return Err("--ticks and --view cannot be used together".into());
+    }
+
     let input = read_input(cli.file)?;
     let circuit = parse_circuit_json(&input)?;
-    let output = simulate_to_output_json(circuit, cli.ticks);
-    let output_str = output_json_to_string(&output)?;
-    println!("{}", output_str);
+
+    if cli.view {
+        view::run_view_mode(circuit).map_err(io::Error::other)?;
+    } else {
+        let ticks = cli.ticks.unwrap_or(100);
+        let output = simulate_to_output_json(circuit, ticks);
+        let output_str = output_json_to_string(&output)?;
+        println!("{}", output_str);
+    }
+
     Ok(())
 }
 
