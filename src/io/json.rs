@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
-use crate::base::ParseError;
+use crate::base::{FormatError, ParseError};
 use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 use crate::simulation::Simulator;
 
@@ -73,25 +73,22 @@ impl TryFrom<CircuitJson> for Circuit {
 }
 
 /// ワイヤ種別文字列を WireKind に変換する。
-pub fn parse_wire_kind(kind: &str) -> Result<WireKind, ParseError> {
+pub fn parse_wire_kind(kind: &str) -> Result<WireKind, FormatError> {
     match kind {
         "positive" => Ok(WireKind::Positive),
         "negative" => Ok(WireKind::Negative),
-        _ => Err(ParseError::InvalidWireKind(kind.to_string())),
+        _ => Err(FormatError::InvalidWireKind(kind.to_string())),
     }
 }
 
 /// パターン文字列 (`"0"` / `"1"` の並び) を bool ベクタに変換する。
-pub fn parse_pattern(pattern: &str) -> Result<Vec<bool>, ParseError> {
+pub fn parse_pattern(pattern: &str) -> Result<Vec<bool>, FormatError> {
     pattern
         .chars()
         .map(|c| match c {
             '1' => Ok(true),
             '0' => Ok(false),
-            _ => Err(ParseError::InvalidWireKind(format!(
-                "invalid pattern character: '{}' (expected '0' or '1')",
-                c
-            ))),
+            _ => Err(FormatError::InvalidPatternChar(c)),
         })
         .collect()
 }

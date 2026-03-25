@@ -32,7 +32,7 @@ fn parse_rejects_invalid_kind() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject unknown kind");
-    assert!(matches!(err, crate::base::ParseError::InvalidWireKind(ref kind) if kind == "unknown"));
+    assert!(matches!(err, crate::base::ParseError::Format(crate::base::FormatError::InvalidWireKind(ref kind)) if kind == "unknown"));
 }
 
 #[test]
@@ -148,7 +148,7 @@ fn parse_rejects_invalid_generator_pattern_char() {
     "#;
 
     let err = parse_circuit_json(input).expect_err("must reject invalid pattern character");
-    assert!(matches!(err, crate::base::ParseError::InvalidWireKind(ref msg) if msg.contains("invalid pattern character")));
+    assert!(matches!(err, crate::base::ParseError::Format(crate::base::FormatError::InvalidPatternChar('x'))));
 }
 
 #[test]
@@ -161,4 +161,25 @@ fn circuit_json_deserializes_without_generators() {
 
     let parsed: CircuitJson = serde_json::from_str(input).expect("must deserialize");
     assert!(parsed.generators.is_empty());
+}
+
+#[test]
+fn parse_wire_kind_returns_format_error() {
+    use crate::io::json::parse_wire_kind;
+    let err = parse_wire_kind("bad").expect_err("must reject unknown kind");
+    assert!(matches!(err, crate::base::FormatError::InvalidWireKind(ref s) if s == "bad"));
+}
+
+#[test]
+fn parse_pattern_returns_invalid_pattern_char_error() {
+    use crate::io::json::parse_pattern;
+    let err = parse_pattern("01a").expect_err("must reject invalid pattern char");
+    assert!(matches!(err, crate::base::FormatError::InvalidPatternChar('a')));
+}
+
+#[test]
+fn parse_pattern_returns_error_for_first_invalid_char() {
+    use crate::io::json::parse_pattern;
+    let err = parse_pattern("z10").expect_err("must reject invalid pattern char");
+    assert!(matches!(err, crate::base::FormatError::InvalidPatternChar('z')));
 }

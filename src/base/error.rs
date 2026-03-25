@@ -23,11 +23,21 @@ pub enum CircuitError {
     EmptyGeneratorPattern(crate::circuit::Pos),
 }
 
+/// Errors that occur during format conversion (wire kind, pattern, etc.).
+#[derive(Debug, thiserror::Error)]
+pub enum FormatError {
+    #[error("wire kind must be positive or negative: {0}")]
+    InvalidWireKind(String),
+
+    #[error("invalid pattern character: '{0}' (expected '0' or '1')")]
+    InvalidPatternChar(char),
+}
+
 /// Errors that occur during JSON parsing and circuit construction.
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
-    #[error("wire kind must be positive or negative: {0}")]
-    InvalidWireKind(String),
+    #[error(transparent)]
+    Format(#[from] FormatError),
 
     #[error(transparent)]
     Json(#[from] serde_json::Error),

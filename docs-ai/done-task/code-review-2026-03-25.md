@@ -3,11 +3,11 @@
 `src/` および `tests/` 以下のコードレビュー結果。
 
 作成日: 2026-03-25
-ステータス: 未着手
+ステータス: 完了
 
 ---
 
-## 1. ParseError::InvalidWireKind がパターン解析エラーに流用されている
+## ~~1. ParseError::InvalidWireKind がパターン解析エラーに流用されている~~ (対応済み)
 
 重要度: **medium**
 
@@ -46,6 +46,15 @@ pub enum ParseError {
 - `src/io/json.rs`: `parse_pattern` のエラー返却を変更
 - `tests/test_helpers.rs`: 同上
 - `src/io/json_tests.rs`: `parse_rejects_invalid_generator_pattern_char` テストの `matches!` パターン修正
+
+### 対応内容
+
+- `FormatError` enum を新設し、`InvalidWireKind(String)` と `InvalidPatternChar(char)` を定義
+- `ParseError` から `InvalidWireKind` を削除し、`Format(#[from] FormatError)` バリアントに置換
+- `parse_wire_kind` の戻り型を `Result<WireKind, FormatError>` に変更
+- `parse_pattern` を `FormatError::InvalidPatternChar` を返すように修正
+- 既存テスト 2 件のパターンマッチを修正、新規テスト 3 件を追加
+- 全 90 テスト OK
 
 ---
 
