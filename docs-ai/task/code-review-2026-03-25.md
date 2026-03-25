@@ -132,13 +132,24 @@ pub fn value_at(&self, tick: u64) -> bool {
 
 ### 問題点
 
-`Pos` 構造体に `Display` トレイトが実装されていないため、エラーメッセージや JSON 出力で `format!("{},{}", pos.x, pos.y)` のような手動フォーマットが複数箇所に分散している。
+`Pos` 構造体に `Display` トレイトが実装されていないため、エラーメッセージで `(.0.x, .0.y)` のような手動フォーマットが `error.rs` 全バリアントに渡って分散している。
+
+手動フォーマット箇所は以下の通りで、`src/base/error.rs` と `src/io/json.rs` の 2 ファイルに限定される。
 
 ### 該当箇所
 
-- [src/base/error.rs](../../src/base/error.rs) 全エラーバリアントで `.src.x, .src.y` 等を個別参照
-- [src/io/json.rs](../../src/io/json.rs#L116) `format!("{},{}", pos.x, pos.y)`
-- [tests/test_helpers.rs](../../tests/test_helpers.rs#L133-L137) `parse_pos` でのパース
+**error.rs（人間向け表示、`"({x}, {y})"` 形式、8 箇所）:**
+- [src/base/error.rs](../../src/base/error.rs#L4) `SelfLoop` — `.src.x, .src.y, .dst.x, .dst.y`
+- [src/base/error.rs](../../src/base/error.rs#L7) `WireSrcNotFound` — `.0.x, .0.y`
+- [src/base/error.rs](../../src/base/error.rs#L10) `WireDstNotFound` — `.0.x, .0.y`
+- [src/base/error.rs](../../src/base/error.rs#L13) `DuplicateWire` — `.src.x, .src.y, .dst.x, .dst.y`
+- [src/base/error.rs](../../src/base/error.rs#L16) `GeneratorTargetHasIncomingWires` — `.0.x, .0.y`
+- [src/base/error.rs](../../src/base/error.rs#L19) `DuplicateGeneratorTarget` — `.0.x, .0.y`
+- [src/base/error.rs](../../src/base/error.rs#L22) `EmptyGeneratorPattern` — `.0.x, .0.y`
+- [src/base/error.rs](../../src/base/error.rs#L42) `UnknownCell` — `.0.x, .0.y`
+
+**json.rs（JSON キー用、`"{x},{y}"` 形式、1 箇所）:**
+- [src/io/json.rs](../../src/io/json.rs#L108) `format!("{},{}", pos.x, pos.y)`
 
 ### 違反しているルール・原則
 
@@ -147,7 +158,9 @@ pub fn value_at(&self, tick: u64) -> bool {
 
 ### 解決策
 
-`Pos` に `Display` を実装する。
+2 つのフォーマットは用途が異なるため、それぞれ別の手段で解決する。
+
+**error.rs 向け — `Pos` に `Display` を実装:**
 
 ```rust
 impl std::fmt::Display for Pos {
@@ -157,13 +170,17 @@ impl std::fmt::Display for Pos {
 }
 ```
 
-ただし、`error.rs` のエラーメッセージ形式と `json.rs` の出力形式 (`"0,0"`) は用途が異なるため、`Display` の導入時にどちらの形式を標準にするか検討が必要。
+`error.rs` 側で `#[error("wire src does not exist in cells: {0}")]` のように簡略化できる。
+
+**json.rs 向け — io モジュール内にフォーマット関数を切り出す:**
+
+JSON キー形式 (`"0,0"`) は io モジュール固有の仕様であり、`Pos::Display` とは独立。io モジュール内に `fn pos_to_json_key(pos: &Pos) -> String` のようなヘルパーを定義し、フォーマットロジックを 1 箇所に集約する。
 
 ### 影響範囲
 
 - `src/circuit/pos.rs`: `Display` 実装追加
 - `src/base/error.rs`: `#[error(...)]` マクロ内のフォーマットを `{.src}` 等に簡略化
-- `json.rs` の出力形式は JSON キーの互換性があるため、`Display` とは別に維持する必要がある可能性あり
+- `src/io/json.rs`: JSON キー生成をヘルパー関数に切り出し
 
 ---
 
