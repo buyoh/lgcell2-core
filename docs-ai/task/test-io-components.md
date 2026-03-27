@@ -37,15 +37,82 @@ Output コンポーネント（回路 → 外部へ値を出力）
 └── Terminal   [将来] — 外部ツール接続端子
 ```
 
-今回は **Tester** の設計・実装のみを行う。Generator は既存実装をそのまま活用する。
+今回は **Tester** の新規設計と、既存 Generator の Input/Output trait 体系への統合を行う。
 
-### Generator（既存・変更なし）
+### Trait 設計
+
+Input / Output コンポーネントの共通インターフェースを trait で定義し、各コンポーネントがそれを実装する。Circuit での格納は enum ディスパッチを使用する。
+
+```rust
+/// Input コンポーネント共通 trait。回路外から値を注入する。
+pub trait InputComponent {
+    /// 対象セルの座標を返す。
+    fn target(&self) -> Pos;
+
+    /// 指定 tick における出力値を返す。
+    fn value_at(&self, tick: u64) -> bool;
+}
+
+/// Output コンポーネント共通 trait。回路のセル値を観測する。
+pub trait OutputComponent {
+    /// 対象セルの座標を返す。
+    fn target(&self) -> Pos;
+}
+```
+
+### Input / Output enum
+
+Circuit 内で格納するために、Clone + Debug を満たす enum を定義する。enum は対応する trait を委譲実装する。
+
+```rust
+/// Input コンポーネントの enum。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Input {
+    Generator(Generator),
+}
+
+impl InputComponent for Input {
+    fn target(&self) -> Pos {
+        match self {
+            Input::Generator(g) => g.target(),
+        }
+    }
+    fn value_at(&self, tick: u64) -> bool {
+        match self {
+            Input::Generator(g) => g.value_at(tick),
+        }
+    }
+}
+
+/// Output コンポーネントの enum。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Output {
+    Tester(Tester),
+}
+
+impl OutputComponent for Output {
+    fn target(&self) -> Pos {
+        match self {
+            Output::Tester(t) => t.target(),
+        }
+    }
+}
+```
+
+将来 Button / Clock / Light 等が追加される場合はバリアントを追加するだけで済む。
+
+### Generator（既存 → InputComponent 実装へ移行）
 
 ```rust
 pub struct Generator {
     target: Pos,
     pattern: Vec<bool>,
     is_loop: bool,
+}
+
+impl InputComponent for Generator {
+    fn target(&self) -> Pos { self.target }
+    fn value_at(&self, tick: u64) -> bool { /* 既存ロジック */ }
 }
 ```
 
@@ -54,11 +121,11 @@ pub struct Generator {
 - `is_loop`: パターンを繰り返すかどうか。false の場合、パターン末尾の値を保持
 
 **制約（既存）:**
-- target セルに incoming wire があってはならない（`CircuitError::GeneratorTargetHasIncomingWires`）
-- 同一 target の Generator は複数定義不可（`CircuitError::DuplicateGeneratorTarget`）
+- target セルに incoming wire があってはならない（`CircuitError::InputTargetHasIncomingWires`）
+- 同一 target の Input コンポーネントは複数定義不可（`CircuitError::DuplicateInputTarget`）
 - pattern は空であってはならない（`CircuitError::EmptyGeneratorPattern`）
 
-### Tester（新規）
+### Tester（新規・OutputComponent 実装）
 
 ```rust
 /// tick ごとに期待パターンでセル値を検証するテスター。
@@ -67,10 +134,14 @@ pub struct Tester {
     expected: Vec<Option<bool>>,
     is_loop: bool,
 }
+
+impl OutputComponent for Tester {
+    fn target(&self) -> Pos { self.target }
+}
 ```
 
 - `target`: 観測対象セルの座標
-- `expected`: tick ごとの期待値。`None` は「そのtickでは検証しない（don't care）」
+- `expected`: tick ごとの期待値。`None` は「その tick では検証しない（don't care）」
 - `is_loop`: パターンを繰り返すかどうか。false の場合、パターン長を超えた tick では検証しない
 
 #### パターン文字列のフォーマット
@@ -105,25 +176,86 @@ impl Tester {
 
 #### 制約
 
-- 同一 target の Tester は複数定義不可（`CircuitError::DuplicateTesterTarget`）
-- Generator の target と Tester の target は重複不可（`CircuitError::TesterTargetIsGeneratorTarget`）
+- 同一 target の Output コンポーネントは複数定義不可（`CircuitError::DuplicateOutputTarget`）
+- Input の target と Output の target は重複可（観測は入力と独立）
 - expected パターンは空であってはならない（`CircuitError::EmptyTesterPattern`）
 
 ### JSON フォーマット
+
+既存の `generators` フィールドを廃止し、`input` / `output` 配列に統合する。各要素は `type` フィールドでコンポーネント種別を区別する。
 
 ```json
 {
   "wires": [
     { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
   ],
-  "generators": [
-    { "target": [0, 0], "pattern": "10", "loop": true }
+  "input": [
+    { "type": "generator", "target": [0, 0], "pattern": "10", "loop": true }
   ],
-  "testers": [
-    { "target": [1, 0], "expected": "x1x0", "loop": false }
+  "output": [
+    { "type": "tester", "target": [1, 0], "expected": "x1x0", "loop": false }
   ]
 }
 ```
+
+#### serde によるデシリアライズ
+
+`type` フィールドによるタグ付き enum デシリアライズを使用する:
+
+```rust
+/// Input コンポーネントの JSON モデル。
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum InputJson {
+    Generator {
+        target: [i32; 2],
+        pattern: String,
+        #[serde(default, rename = "loop")]
+        is_loop: bool,
+    },
+}
+
+/// Output コンポーネントの JSON モデル。
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum OutputJson {
+    Tester {
+        target: [i32; 2],
+        expected: String,
+        #[serde(default, rename = "loop")]
+        is_loop: bool,
+    },
+}
+
+/// 回路 JSON 全体。
+#[derive(Debug, Deserialize)]
+pub struct CircuitJson {
+    pub wires: Vec<WireJson>,
+    #[serde(default)]
+    pub input: Vec<InputJson>,
+    #[serde(default)]
+    pub output: Vec<OutputJson>,
+}
+```
+
+#### 後方互換性
+
+既存の `generators` フィールドを持つ JSON を段階的に移行するため、パーサーで `generators` も受け付ける過渡期を設ける:
+
+```rust
+pub struct CircuitJson {
+    pub wires: Vec<WireJson>,
+    #[serde(default)]
+    pub input: Vec<InputJson>,
+    #[serde(default)]
+    pub output: Vec<OutputJson>,
+    /// deprecated: input に移行。両方指定された場合はマージする。
+    #[serde(default)]
+    pub generators: Vec<GeneratorJson>,
+}
+```
+
+既存テストの `circuit.json` は新フォーマットに書き換える。
 
 ### Circuit への統合
 
@@ -131,18 +263,32 @@ impl Tester {
 pub struct Circuit {
     cells: BTreeSet<Pos>,
     wires: Vec<Wire>,
-    generators: Vec<Generator>,
-    testers: Vec<Tester>,       // 追加
+    inputs: Vec<Input>,         // generators → inputs に変更
+    outputs: Vec<Output>,       // 追加
     incoming: HashMap<Pos, Vec<usize>>,
     sorted_cells: Vec<Pos>,
 }
 ```
 
-- `with_generators` を拡張するか、新たに `with_components` メソッドを追加
-- Tester の target セルは自動的に cells に追加される（Generator と同様）
-- ただし Tester の target セルは incoming wire を持ってよい（Generator と異なる）
+- `with_generators` は `with_components` に改名（既存シグネチャは deprecated ラッパーで維持）
+- Input の target セルは自動的に cells に追加される（Generator と同様）
+- Output の target セルも自動的に cells に追加される
+- Input の target セルは incoming wire を持ってはならない（既存制約を Input 全体に一般化）
+- Output の target セルは incoming wire を持ってよい
 
 ### Simulator への統合
+
+Simulator の `apply_generators` は `InputComponent` trait を使って一般化:
+
+```rust
+fn apply_inputs(&mut self) {
+    for input in self.circuit.inputs() {
+        let value = input.value_at(self.tick);
+        self.prev_state.set(input.target(), value).expect("...");
+        self.curr_state.set(input.target(), value).expect("...");
+    }
+}
+```
 
 Tester はシミュレーションの実行自体には影響しない（読み取り専用の観測者）。検証は Simulator に `verify_testers()` メソッドを追加して実行する:
 
@@ -174,20 +320,29 @@ impl Simulator {
 }
 ```
 
-既存の `check.json` ベースのテストフレームワークはそのまま維持する。Tester を使ったテストは新しいテストタイプ（`type: simulation` はそのまま、`testers` が `circuit.json` にあれば自動検証）として追加可能。
+既存の `check.json` ベースのテストフレームワークはそのまま維持する。Tester を使ったテストは新しいテストタイプ（`type: simulation` はそのまま、`output` に tester があれば自動検証）として追加可能。
 
-### エラー型の追加
+### エラー型の変更
 
-`CircuitError` に以下を追加:
+`CircuitError` の既存バリアントをリネームし、新バリアントを追加:
 
 ```rust
 pub enum CircuitError {
-    // ... 既存 ...
-    #[error("duplicate tester target is not allowed: {0}")]
-    DuplicateTesterTarget(Pos),
+    // ... 既存ワイヤ系 ...
 
-    #[error("tester target {0} must not be a generator target")]
-    TesterTargetIsGeneratorTarget(Pos),
+    // Input (旧 Generator 系をリネーム)
+    #[error("input target {0} must not have incoming wires")]
+    InputTargetHasIncomingWires(Pos),
+
+    #[error("duplicate input target is not allowed: {0}")]
+    DuplicateInputTarget(Pos),
+
+    #[error("generator pattern must not be empty: {0}")]
+    EmptyGeneratorPattern(Pos),
+
+    // Output (新規)
+    #[error("duplicate output target is not allowed: {0}")]
+    DuplicateOutputTarget(Pos),
 
     #[error("tester expected pattern must not be empty: {0}")]
     EmptyTesterPattern(Pos),
@@ -206,39 +361,57 @@ pub enum FormatError {
 
 ## ステップ
 
-1. **`Tester` 構造体の実装** (`src/circuit/tester.rs`)
+1. **Trait 定義** (`src/circuit/component.rs`)
+   - `InputComponent` trait, `OutputComponent` trait
+   - `Input` enum, `Output` enum（trait の委譲実装）
+
+2. **`Tester` 構造体の実装** (`src/circuit/tester.rs`)
    - `Tester` struct, `new()`, `target()`, `expected()`, `is_loop()`, `expected_at()`
+   - `OutputComponent` 実装
    - ユニットテスト
 
-2. **エラー型の追加** (`src/base/error.rs`)
-   - `CircuitError` に 3 バリアント追加
+3. **`Generator` への `InputComponent` 実装** (`src/circuit/generator.rs`)
+   - `InputComponent` trait 実装追加
+   - 既存メソッドはそのまま維持
+
+4. **エラー型の変更** (`src/base/error.rs`)
+   - Generator 系バリアントを Input 系にリネーム
+   - Output 系バリアント追加
    - `FormatError` に 1 バリアント追加
 
-3. **`Circuit` への統合** (`src/circuit/circuit.rs`)
-   - `testers` フィールド追加
-   - コンストラクタでの Tester バリデーション
-   - `testers()` アクセサ追加
+5. **`Circuit` の変更** (`src/circuit/circuit.rs`)
+   - `generators` → `inputs: Vec<Input>`, `outputs: Vec<Output>` に変更
+   - `with_generators` → `with_components` に改名（互換ラッパー維持）
+   - コンストラクタでの Input/Output バリデーション
+   - `inputs()`, `outputs()` アクセサ追加
    - ユニットテスト
 
-4. **JSON パーサーへの統合** (`src/io/json.rs`)
-   - `TesterJson` モデル追加
-   - `CircuitJson.testers` フィールド追加
+6. **JSON パーサーの変更** (`src/io/json.rs`)
+   - `GeneratorJson` → `InputJson` tagged enum に変更
+   - `OutputJson` tagged enum 追加
+   - `CircuitJson` フィールド変更 (`input`, `output`)
    - `parse_expected_pattern()` 関数追加
-   - `TryFrom<CircuitJson>` の拡張
+   - `TryFrom<CircuitJson>` の更新
+   - 後方互換: `generators` フィールドのマージ対応
    - ユニットテスト
 
-5. **`Simulator` への検証メソッド追加** (`src/simulation/engine.rs`)
+7. **`Simulator` の変更** (`src/simulation/engine.rs`)
+   - `apply_generators` → `apply_inputs`（`InputComponent` trait 使用）
    - `TesterResult` 構造体
    - `verify_testers()` メソッド
    - `run_with_verification()` メソッド
    - ユニットテスト
 
-6. **テストフレームワークへの統合** (`tests/test_helpers.rs`)
+8. **既存テストリソースの移行** (`resources/tests/`)
+   - 既存 `circuit.json` の `generators` を `input` フォーマットに書き換え
+
+9. **テストフレームワークへの統合** (`tests/test_helpers.rs`)
    - Tester がある場合の自動検証ロジック追加
+   - `check.json` の `generators` override を `input` override に変更
 
-7. **テストケースの追加** (`resources/tests/`)
-   - Tester を使ったシミュレーションテスト
-   - Tester バリデーション用 parse_error テスト
+10. **新規テストケースの追加** (`resources/tests/`)
+    - Tester を使ったシミュレーションテスト
+    - Tester バリデーション用 parse_error テスト
 
-8. **アーキテクチャドキュメントの更新** (`docs-ai/architecture/data-model.md`)
-   - Tester の説明を追加
+11. **アーキテクチャドキュメントの更新** (`docs-ai/architecture/data-model.md`)
+    - Input/Output trait, enum, Tester の説明を追加
