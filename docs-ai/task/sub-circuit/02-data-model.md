@@ -26,6 +26,7 @@ JSON パース用のモジュールインスタンスモデル。
 pub struct ModuleJson {
     #[serde(rename = "type")]
     pub module_type: String,
+    pub sub_circuit: Option<String>,
     pub input: Vec<[i32; 2]>,
     pub output: Vec<[i32; 2]>,
 }
@@ -116,10 +117,12 @@ impl Circuit {
 
 `Circuit::with_modules` で以下を追加検証する:
 
-1. モジュールの出力セルが `incoming` に含まれないこと（入力ワイヤ禁止）
-2. モジュールの出力セル間で座標の重複がないこと
-3. モジュールの出力セルが Generator ターゲットでないこと
-4. 各モジュールについて `max(input) < min(output)` が辞書順で成り立つこと
+1. ポート列制約: 各モジュールの `input` が同一 x 座標・連続 y 座標であること
+2. ポート列制約: 各モジュールの `output` が同一 x 座標・連続 y 座標であること
+3. 各モジュールについて `output` の x > `input` の x
+4. モジュールの出力セルが `incoming` に含まれないこと（入力ワイヤ禁止）
+5. モジュールの出力セル間で座標の重複がないこと
+6. モジュールの出力セルが Generator ターゲットでないこと
 
 ## エラー型の追加（base/error.rs）
 
@@ -137,6 +140,9 @@ pub enum CircuitError {
 
     #[error("module output must come after all module inputs in lexicographic order")]
     ModuleOutputBeforeInput,
+
+    #[error("port column constraint violated: ports must share same x and have contiguous y")]
+    InvalidPortColumn,
 
     #[error("sub_input count mismatch: expected {expected}, got {actual}")]
     SubInputCountMismatch { expected: usize, actual: usize },

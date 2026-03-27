@@ -20,9 +20,12 @@
 
 | フィールド | 型 | 必須 | 説明 |
 |---|---|---|---|
-| `type` | `string` | はい | 使用するサブ回路定義の名前 |
+| `type` | `string` | はい | モジュール種別。サブ回路の場合は `"sub"` |
+| `sub_circuit` | `string` | `type` が `"sub"` のとき必須 | 使用するサブ回路定義の名前 |
 | `input` | `[i32, i32][]` | はい | 親座標系での入力セル位置。要素数はサブ回路の `sub_input` と一致 |
 | `output` | `[i32, i32][]` | はい | 親座標系での出力セル位置。要素数はサブ回路の `sub_output` と一致 |
+
+`type` フィールドは将来の組み込みモジュール型（例: メモリ、クロック等）との混在を想定し、サブ回路参照名とは分離する。
 
 ## SubCircuit オブジェクト
 
@@ -47,7 +50,7 @@
 │   ├── half_adder    ← 定義
 │   └── full_adder    ← 定義（modules 内で half_adder を参照可能）
 └── modules
-    └── { type: "full_adder" }  ← インスタンス
+    └── { type: "sub", sub_circuit: "full_adder" }  ← インスタンス
 ```
 
 ## 完全な例: 半加算器をサブ回路として使用
@@ -62,7 +65,8 @@
   ],
   "modules": [
     {
-      "type": "half_adder",
+      "type": "sub",
+      "sub_circuit": "half_adder",
       "input": [ [1, 0], [1, 1] ],
       "output": [ [2, 0], [2, 1] ]
     }
@@ -97,7 +101,8 @@
   "wires": [],
   "modules": [
     {
-      "type": "full_adder",
+      "type": "sub",
+      "sub_circuit": "full_adder",
       "input": [ [0, 0], [0, 1], [0, 2] ],
       "output": [ [5, 0], [5, 1] ]
     }
@@ -122,22 +127,24 @@
     "full_adder": {
       "wires": [
         { "src": [3, 0], "dst": [4, 0], "kind": "positive" },
-        { "src": [0, 2], "dst": [4, 0], "kind": "positive" },
-        { "src": [3, 1], "dst": [7, 1], "kind": "positive" },
-        { "src": [6, 1], "dst": [7, 1], "kind": "positive" }
+        { "src": [0, 2], "dst": [4, 1], "kind": "positive" },
+        { "src": [3, 1], "dst": [8, 1], "kind": "positive" },
+        { "src": [7, 1], "dst": [8, 1], "kind": "positive" }
       ],
       "sub_input": [ [0, 0], [0, 1], [0, 2] ],
-      "sub_output": [ [7, 0], [7, 1] ],
+      "sub_output": [ [8, 0], [8, 1] ],
       "modules": [
         {
-          "type": "half_adder",
+          "type": "sub",
+          "sub_circuit": "half_adder",
           "input": [ [0, 0], [0, 1] ],
           "output": [ [3, 0], [3, 1] ]
         },
         {
-          "type": "half_adder",
-          "input": [ [4, 0], [0, 2] ],
-          "output": [ [7, 0], [6, 1] ]
+          "type": "sub",
+          "sub_circuit": "half_adder",
+          "input": [ [4, 0], [4, 1] ],
+          "output": [ [7, 0], [7, 1] ]
         }
       ]
     }
@@ -147,20 +154,35 @@
 
 ## 制約
 
+### ポート列制約（Column Port Constraint）
+
+入出力ポートの座標に以下の制約を設ける。これはモジュールインスタンスの `input`/`output` と、サブ回路定義の `sub_input`/`sub_output` の両方に適用される:
+
+1. **同一 x 座標**: 全入力ポートは同一の x 座標を持つこと。全出力ポートも同一の x 座標を持つこと
+2. **連続する y 座標**: 各グループ内で y 座標は連続する整数であること（y_base, y_base+1, y_base+2, ...）
+3. **出力 > 入力**: 出力ポートの x 座標は入力ポートの x 座標より大きいこと
+
+```
+入力ポート列 (x=1)    出力ポート列 (x=5)
+  (1, 0) ─ input[0]     (5, 0) ─ output[0]
+  (1, 1) ─ input[1]     (5, 1) ─ output[1]
+  (1, 2) ─ input[2]
+```
+
+この制約により、親回路の辞書順 (x, y) 処理において入力列が全て処理された後に出力列に到達することが保証され、階層的シミュレーションとフラット展開の等価性を維持する。
+
 ### モジュールインスタンス
 
-1. `modules[i].input` の要素数は、参照するサブ回路の `sub_input` の要素数と一致すること
-2. `modules[i].output` の要素数は、参照するサブ回路の `sub_output` の要素数と一致すること
-3. `modules[i].output` の全座標は、`modules[i].input` の全座標より辞書順で後でなければならない
-4. `modules[i].output` の各座標は、親回路内でワイヤの `dst` になってはならない（入力ワイヤ禁止）
-5. 異なるモジュール間で `output` 座標が重複してはならない
-6. `modules[i].type` で指定されたサブ回路定義が `sub_circuits` 内に存在すること
+4. `modules[i].input` の要素数は、参照するサブ回路の `sub_input` の要素数と一致すること
+5. `modules[i].output` の要素数は、参照するサブ回路の `sub_output` の要素数と一致すること
+6. `modules[i].output` の各座標は、親回路内でワイヤの `dst` になってはならない（入力ワイヤ禁止）
+7. 異なるモジュール間で `output` 座標が重複してはならない
+8. `modules[i].sub_circuit` で指定されたサブ回路定義が `sub_circuits` 内に存在すること
 
 ### サブ回路定義
 
-7. `sub_output` の全座標は `sub_input` の全座標より辞書順で後でなければならない
-8. `sub_input` の各座標はサブ回路内でワイヤの `dst` になってはならない（入力ワイヤ禁止）
-9. サブ回路の依存グラフに循環があってはならない（A が B を参照し、B が A を参照するなど）
+9. `sub_input` の各座標はサブ回路内でワイヤの `dst` になってはならない（入力ワイヤ禁止）
+10. サブ回路の依存グラフに循環があってはならない（A が B を参照し、B が A を参照するなど）
 
 ### 許容される組合せ
 

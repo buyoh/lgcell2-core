@@ -9,7 +9,7 @@
 
 ### 作業内容
 1. `ResolvedModule` 構造体を定義（アクセサのみ、ロジックなし）
-2. `CircuitError` に `ModuleOutputHasIncomingWires`, `DuplicateModuleOutput`, `ModuleOutputBeforeInput`, `SubInputCountMismatch`, `SubOutputCountMismatch`, `SubOutputBeforeSubInput`, `SubInputHasIncomingWires` を追加
+2. `CircuitError` に `ModuleOutputHasIncomingWires`, `DuplicateModuleOutput`, `ModuleOutputBeforeInput`, `InvalidPortColumn`, `SubInputCountMismatch`, `SubOutputCountMismatch`, `SubOutputBeforeSubInput`, `SubInputHasIncomingWires` を追加
 3. `ParseError` に `SubCircuitNotFound`, `CircularDependency` を追加
 
 ## ステップ 2: Circuit の拡張
@@ -20,7 +20,7 @@
 ### 作業内容
 1. `Circuit` に `modules: Vec<ResolvedModule>` フィールドを追加
 2. `Circuit::with_modules()` コンストラクタを追加（既存 `with_components` を拡張）
-3. モジュール出力セルの検証ロジック（入力ワイヤ禁止、重複禁止、順序制約）
+3. モジュール出力セルの検証ロジック（入力ワイヤ禁止、重複禁止、ポート列制約）
 4. 既存テストが通ることを確認（`modules` が空の場合に既存動作が変わらない）
 
 ## ステップ 3: JSON パース（サブ回路解決）
@@ -75,6 +75,8 @@
 - 出力セルに入力ワイヤが接続
 - 出力セルが複数モジュール間で重複
 - sub_input に入力ワイヤが接続
+- ポート列制約違反（入力ポートが異なる x 座標）
+- ポート列制約違反（y 座標が非連続）
 
 ## ステップ 6: ドキュメント更新
 
