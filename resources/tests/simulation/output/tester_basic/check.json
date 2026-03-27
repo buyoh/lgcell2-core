@@ -1,0 +1,20 @@
+{
+  "ticks": 2,
+  "cases": [
+    {
+      "name": "base_tick2",
+      "expected": { "1,0": false }
+    },
+    {
+      "name": "case_input_override",
+      "ticks": 2,
+      "input": [
+        { "type": "generator", "target": [0, 0], "pattern": "01", "loop": true }
+      ],
+      "output": [
+        { "type": "tester", "target": [1, 0], "expected": "01", "loop": true }
+      ],
+      "expected": { "1,0": true }
+    }
+  ]
+}

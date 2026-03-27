@@ -135,20 +135,21 @@ fn parse_generators_and_apply_default_loop_false() {
       "wires": [
         { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
       ],
-      "generators": [
-        { "target": [0, 0], "pattern": "10" }
+      "input": [
+        { "type": "generator", "target": [0, 0], "pattern": "10" }
       ]
     }
     "#;
 
     let circuit = parse_circuit_json(input).expect("json must parse");
-    assert_eq!(circuit.generators().len(), 1);
-    assert_eq!(
-        circuit.generators()[0].target(),
-        crate::circuit::Pos::new(0, 0)
-    );
-    assert_eq!(circuit.generators()[0].pattern(), &[true, false]);
-    assert!(!circuit.generators()[0].is_loop());
+    assert_eq!(circuit.inputs().len(), 1);
+    match &circuit.inputs()[0] {
+        crate::circuit::Input::Generator(generator) => {
+            assert_eq!(generator.target(), crate::circuit::Pos::new(0, 0));
+            assert_eq!(generator.pattern(), &[true, false]);
+            assert!(!generator.is_loop());
+        }
+    }
 }
 
 #[test]
@@ -158,8 +159,8 @@ fn parse_rejects_invalid_generator_pattern_char() {
       "wires": [
         { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
       ],
-      "generators": [
-        { "target": [0, 0], "pattern": "10x" }
+      "input": [
+        { "type": "generator", "target": [0, 0], "pattern": "10x" }
       ]
     }
     "#;
@@ -180,8 +181,35 @@ fn circuit_json_deserializes_without_generators() {
     "#;
 
     let parsed: CircuitJson = serde_json::from_str(input).expect("must deserialize");
+    assert!(parsed.input.is_empty());
     assert!(parsed.generators.is_empty());
 }
+
+  #[test]
+  fn circuit_json_deserializes_legacy_generators_for_compatibility() {
+    let input = r#"
+    {
+      "wires": [],
+      "generators": [
+      { "target": [0, 0], "pattern": "10" }
+      ]
+    }
+    "#;
+
+    let parsed: CircuitJson = serde_json::from_str(input).expect("must deserialize");
+    assert_eq!(parsed.generators.len(), 1);
+  }
+
+  #[test]
+  fn parse_expected_pattern_returns_invalid_expected_pattern_char_error() {
+    use crate::io::json::parse_expected_pattern;
+
+    let err = parse_expected_pattern("10a").expect_err("must reject invalid expected pattern");
+    assert!(matches!(
+      err,
+      crate::base::FormatError::InvalidExpectedPatternChar('a')
+    ));
+  }
 
 #[test]
 fn parse_wire_kind_returns_format_error() {

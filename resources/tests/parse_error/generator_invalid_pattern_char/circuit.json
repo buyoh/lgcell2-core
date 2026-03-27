@@ -2,7 +2,7 @@
   "wires": [
     { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
   ],
-  "generators": [
-    { "target": [2, 0], "pattern": "10x" }
+  "input": [
+    { "type": "generator", "target": [2, 0], "pattern": "10x" }
   ]
 }

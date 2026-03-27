@@ -13,8 +13,8 @@
     {
       "name": "case_generator_override_loop",
       "ticks": 3,
-      "generators": [
-        { "target": [0, 0], "pattern": "01", "loop": true }
+      "input": [
+        {"type": "generator", "target": [0, 0], "pattern": "01", "loop": true}
       ],
       "expected": { "1,0": false }
     }

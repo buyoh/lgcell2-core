@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use crate::base::CircuitError;
-use crate::circuit::{Generator, Pos, Wire};
+use crate::circuit::{Generator, Input, InputComponent, Output, OutputComponent, Pos, Wire};
 
 /// 回路の構造定義。構築後は不変。
 /// 全セルの初期値は 0 (false) 固定。
@@ -11,8 +11,10 @@ pub struct Circuit {
     cells: BTreeSet<Pos>,
     /// 全ワイヤ。
     wires: Vec<Wire>,
-    /// 全ジェネレーター。
-    generators: Vec<Generator>,
+    /// 全 Input コンポーネント。
+    inputs: Vec<Input>,
+    /// 全 Output コンポーネント。
+    outputs: Vec<Output>,
     /// dst でグループ化したワイヤインデックス（事前計算）。
     incoming: HashMap<Pos, Vec<usize>>,
     /// ソート済みセル座標リスト（事前計算）。
@@ -20,16 +22,17 @@ pub struct Circuit {
 }
 
 impl Circuit {
-    /// ジェネレーターなしで回路を構築する（既存互換）。
+    /// Input/Output なしで回路を構築する（既存互換）。
     pub fn new(cells: BTreeSet<Pos>, wires: Vec<Wire>) -> Result<Self, CircuitError> {
-        Self::with_generators(cells, wires, Vec::new())
+        Self::with_components(cells, wires, Vec::new(), Vec::new())
     }
 
-    /// セル定義とワイヤ定義、ジェネレーター定義から回路を構築する。
-    pub fn with_generators(
+    /// セル定義とワイヤ定義、Input/Output コンポーネント定義から回路を構築する。
+    pub fn with_components(
         mut cells: BTreeSet<Pos>,
         wires: Vec<Wire>,
-        generators: Vec<Generator>,
+        inputs: Vec<Input>,
+        outputs: Vec<Output>,
     ) -> Result<Self, CircuitError> {
         let mut seen_pairs: HashSet<(Pos, Pos)> = HashSet::new();
 
@@ -62,27 +65,44 @@ impl Circuit {
             incoming.entry(wire.dst).or_default().push(idx);
         }
 
-        let mut generator_targets: HashSet<Pos> = HashSet::new();
-        for generator in &generators {
-            if incoming
-                .get(&generator.target())
-                .map(|v| !v.is_empty())
-                .unwrap_or(false)
-            {
-                return Err(CircuitError::GeneratorTargetHasIncomingWires(
-                    generator.target(),
-                ));
+        let mut input_targets: HashSet<Pos> = HashSet::new();
+        for input in &inputs {
+            let target = input.target();
+            if incoming.get(&target).map(|v| !v.is_empty()).unwrap_or(false) {
+                return Err(CircuitError::InputTargetHasIncomingWires(target));
             }
 
-            if !generator_targets.insert(generator.target()) {
-                return Err(CircuitError::DuplicateGeneratorTarget(generator.target()));
+            if !input_targets.insert(target) {
+                return Err(CircuitError::DuplicateInputTarget(target));
             }
 
-            if generator.pattern().is_empty() {
-                return Err(CircuitError::EmptyGeneratorPattern(generator.target()));
+            match input {
+                Input::Generator(generator) => {
+                    if generator.pattern().is_empty() {
+                        return Err(CircuitError::EmptyGeneratorPattern(target));
+                    }
+                }
             }
 
-            cells.insert(generator.target());
+            cells.insert(target);
+        }
+
+        let mut output_targets: HashSet<Pos> = HashSet::new();
+        for output in &outputs {
+            let target = output.target();
+            if !output_targets.insert(target) {
+                return Err(CircuitError::DuplicateOutputTarget(target));
+            }
+
+            match output {
+                Output::Tester(tester) => {
+                    if tester.expected().is_empty() {
+                        return Err(CircuitError::EmptyTesterPattern(target));
+                    }
+                }
+            }
+
+            cells.insert(target);
         }
 
         let sorted_cells = cells.iter().copied().collect::<Vec<_>>();
@@ -90,10 +110,25 @@ impl Circuit {
         Ok(Self {
             cells,
             wires,
-            generators,
+            inputs,
+            outputs,
             incoming,
             sorted_cells,
         })
+    }
+
+    /// セル定義とワイヤ定義、ジェネレーター定義から回路を構築する。
+    /// 既存互換 API として残している。
+    pub fn with_generators(
+        cells: BTreeSet<Pos>,
+        wires: Vec<Wire>,
+        generators: Vec<Generator>,
+    ) -> Result<Self, CircuitError> {
+        let inputs = generators
+            .into_iter()
+            .map(Input::Generator)
+            .collect::<Vec<_>>();
+        Self::with_components(cells, wires, inputs, Vec::new())
     }
 
     /// 全セルの座標一覧を返す。
@@ -106,9 +141,14 @@ impl Circuit {
         &self.wires
     }
 
-    /// 全ジェネレーターを返す。
-    pub fn generators(&self) -> &[Generator] {
-        &self.generators
+    /// 全 Input コンポーネントを返す。
+    pub fn inputs(&self) -> &[Input] {
+        &self.inputs
+    }
+
+    /// 全 Output コンポーネントを返す。
+    pub fn outputs(&self) -> &[Output] {
+        &self.outputs
     }
 
     /// 伝搬順にソート済みのセル一覧を返す。

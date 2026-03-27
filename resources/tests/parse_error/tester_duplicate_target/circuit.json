@@ -1,0 +1,9 @@
+{
+  "wires": [
+    { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
+  ],
+  "output": [
+    { "type": "tester", "target": [1, 0], "expected": "1" },
+    { "type": "tester", "target": [1, 0], "expected": "0" }
+  ]
+}

@@ -19,14 +19,20 @@ pub enum CircuitError {
         dst: crate::circuit::Pos,
     },
 
-    #[error("generator target {0} must not have incoming wires")]
-    GeneratorTargetHasIncomingWires(crate::circuit::Pos),
+    #[error("input target {0} must not have incoming wires")]
+    InputTargetHasIncomingWires(crate::circuit::Pos),
 
-    #[error("duplicate generator target is not allowed: {0}")]
-    DuplicateGeneratorTarget(crate::circuit::Pos),
+    #[error("duplicate input target is not allowed: {0}")]
+    DuplicateInputTarget(crate::circuit::Pos),
 
     #[error("generator pattern must not be empty: {0}")]
     EmptyGeneratorPattern(crate::circuit::Pos),
+
+    #[error("duplicate output target is not allowed: {0}")]
+    DuplicateOutputTarget(crate::circuit::Pos),
+
+    #[error("tester expected pattern must not be empty: {0}")]
+    EmptyTesterPattern(crate::circuit::Pos),
 }
 
 /// Errors that occur during format conversion (wire kind, pattern, etc.).
@@ -37,6 +43,9 @@ pub enum FormatError {
 
     #[error("invalid pattern character: '{0}' (expected '0' or '1')")]
     InvalidPatternChar(char),
+
+    #[error("invalid expected pattern character: '{0}' (expected '0', '1', or 'x')")]
+    InvalidExpectedPatternChar(char),
 }
 
 /// Errors that occur during JSON parsing and circuit construction.

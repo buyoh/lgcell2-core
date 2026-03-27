@@ -3,7 +3,16 @@
 テスト用の入力コンポーネント（Generator）と出力コンポーネント（Tester）を設計し、回路定義の中でテスト対象の期待値を表現できるようにする。
 
 作成日: 2026-03-27
-ステータス: 設計完了（未実装）
+ステータス: 完了
+
+## 進捗
+
+- 2026-03-27: Input/Output trait 体系 (`InputComponent` / `OutputComponent`) を実装
+- 2026-03-27: `Input` / `Output` enum を追加し、`Generator` / `Tester` を統合
+- 2026-03-27: `Circuit` を `inputs` / `outputs` 保持へ拡張、バリデーションを Input/Output 用に更新
+- 2026-03-27: JSON を `input` / `output` + `type` 形式へ対応（`generators` / `testers` は後方互換で受理）
+- 2026-03-27: `Simulator` に `verify_testers()` / `run_with_verification()` を追加
+- 2026-03-27: テスト追加（unit + feature resources）と `cargo test` 全件成功
 
 ## 背景・動機
 

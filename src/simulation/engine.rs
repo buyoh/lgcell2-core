@@ -1,5 +1,5 @@
 use crate::base::SimulationError;
-use crate::circuit::{Circuit, Pos};
+use crate::circuit::{Circuit, InputComponent, Output, Pos};
 use crate::simulation::state::SimState;
 
 /// `Simulator::step()` の戻り値。
@@ -16,6 +16,15 @@ pub enum StepResult {
 pub struct TickSnapshot {
     pub tick: u64,
     pub cells: Vec<(Pos, bool)>,
+}
+
+/// テスター検証の不一致結果。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TesterResult {
+    pub target: Pos,
+    pub tick: u64,
+    pub expected: bool,
+    pub actual: bool,
 }
 
 /// `Simulator::state_mut()` 経由で prev_state と curr_state を同時に更新するためのヘルパー。
@@ -60,22 +69,22 @@ impl Simulator {
         }
     }
 
-    fn apply_generators(&mut self) {
-        for generator in self.circuit.generators() {
-            let value = generator.value_at(self.tick);
+    fn apply_inputs(&mut self) {
+        for input in self.circuit.inputs() {
+            let value = input.value_at(self.tick);
             self.prev_state
-                .set(generator.target(), value)
-                .expect("generator target must exist in previous state");
+                .set(input.target(), value)
+                .expect("input target must exist in previous state");
             self.curr_state
-                .set(generator.target(), value)
-                .expect("generator target must exist in current state");
+                .set(input.target(), value)
+                .expect("input target must exist in current state");
         }
     }
 
     /// 1 セル分だけ進める。中断ポイント。
     pub fn step(&mut self) -> StepResult {
         if self.cell_index == 0 {
-            self.apply_generators();
+            self.apply_inputs();
         }
 
         let cell = self.circuit.sorted_cells()[self.cell_index];
@@ -160,6 +169,48 @@ impl Simulator {
             });
         }
         snapshots
+    }
+
+    /// 直近で完了した tick のテスター検証を行い、不一致を返す。
+    pub fn verify_testers(&self) -> Vec<TesterResult> {
+        if self.tick == 0 {
+            return Vec::new();
+        }
+
+        let observed_tick = self.tick - 1;
+        let mut mismatches = Vec::new();
+        for output in self.circuit.outputs() {
+            match output {
+                Output::Tester(tester) => {
+                    if let Some(expected) = tester.expected_at(observed_tick) {
+                        let actual = self
+                            .prev_state
+                            .get(tester.target())
+                            .expect("tester target must exist in simulation state");
+                        if actual != expected {
+                            mismatches.push(TesterResult {
+                                target: tester.target(),
+                                tick: observed_tick,
+                                expected,
+                                actual,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        mismatches
+    }
+
+    /// 指定 tick 数だけ進め、各 tick のテスター検証結果を収集して返す。
+    pub fn run_with_verification(&mut self, ticks: u64) -> Vec<TesterResult> {
+        let mut mismatches = Vec::new();
+        for _ in 0..ticks {
+            self.tick();
+            mismatches.extend(self.verify_testers());
+        }
+        mismatches
     }
 
     /// 回路定義を取得する。

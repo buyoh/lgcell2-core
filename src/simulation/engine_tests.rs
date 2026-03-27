@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
+use crate::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire, WireKind};
 use crate::simulation::{Simulator, StepResult};
 
 fn make_circuit(cells: &[Pos], wires: Vec<Wire>) -> Circuit {
@@ -12,12 +12,27 @@ fn make_circuit_with_generators(
     wires: Vec<Wire>,
     generators: Vec<Generator>,
 ) -> Circuit {
-    Circuit::with_generators(
+    let inputs = generators
+        .into_iter()
+        .map(Input::Generator)
+        .collect::<Vec<_>>();
+    Circuit::with_components(
         BTreeSet::from_iter(cells.iter().copied()),
         wires,
-        generators,
+        inputs,
+        Vec::new(),
     )
     .expect("valid circuit")
+}
+
+fn make_circuit_with_components(
+    cells: &[Pos],
+    wires: Vec<Wire>,
+    inputs: Vec<Input>,
+    outputs: Vec<Output>,
+) -> Circuit {
+    Circuit::with_components(BTreeSet::from_iter(cells.iter().copied()), wires, inputs, outputs)
+        .expect("valid circuit")
 }
 
 #[test]
@@ -186,4 +201,63 @@ fn circuit_accessor_returns_original_circuit() {
 
     assert_eq!(sim.circuit().sorted_cells(), circuit.sorted_cells());
     assert_eq!(sim.circuit().wires(), circuit.wires());
+}
+
+#[test]
+fn verify_testers_detects_mismatch_after_tick() {
+    let circuit = make_circuit_with_components(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            WireKind::Positive,
+        )],
+        vec![Input::Generator(Generator::new(
+            Pos::new(0, 0),
+            vec![false],
+            false,
+        ))],
+        vec![Output::Tester(Tester::new(
+            Pos::new(1, 0),
+            vec![Some(true)],
+            false,
+        ))],
+    );
+
+    let mut sim = Simulator::new(circuit);
+    sim.tick();
+
+    let mismatches = sim.verify_testers();
+    assert_eq!(mismatches.len(), 1);
+    assert_eq!(mismatches[0].tick, 0);
+    assert_eq!(mismatches[0].expected, true);
+    assert_eq!(mismatches[0].actual, false);
+}
+
+#[test]
+fn run_with_verification_collects_all_tick_mismatches() {
+    let circuit = make_circuit_with_components(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            WireKind::Positive,
+        )],
+        vec![Input::Generator(Generator::new(
+            Pos::new(0, 0),
+            vec![true, false],
+            true,
+        ))],
+        vec![Output::Tester(Tester::new(
+            Pos::new(1, 0),
+            vec![Some(false), Some(false)],
+            true,
+        ))],
+    );
+
+    let mut sim = Simulator::new(circuit);
+    let mismatches = sim.run_with_verification(2);
+
+    assert_eq!(mismatches.len(), 1);
+    assert_eq!(mismatches[0].tick, 0);
 }

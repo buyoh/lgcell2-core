@@ -4,16 +4,16 @@
     {
       "name": "single_pulse_shifts",
       "comment": "1 tick パルスが 2 段のバッファを通過し stage2 に到達",
-      "generators": [
-        { "target": [0, 0], "pattern": "10000" }
+      "input": [
+        {"type": "generator", "target": [0, 0], "pattern": "10000"}
       ],
       "expected": { "0,1": false, "0,2": true }
     },
     {
       "name": "double_pulse_propagates",
       "comment": "2 tick パルスが各段に伝搬",
-      "generators": [
-        { "target": [0, 0], "pattern": "11000" }
+      "input": [
+        {"type": "generator", "target": [0, 0], "pattern": "11000"}
       ],
       "expected": { "0,1": true, "0,2": true }
     }

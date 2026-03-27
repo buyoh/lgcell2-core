@@ -4,18 +4,18 @@
     {
       "name": "set_then_hold",
       "comment": "S=1 で set → S=0 で hold。Q=1 を維持",
-      "generators": [
-        { "target": [0, 0], "pattern": "0000" },
-        { "target": [0, 1], "pattern": "1000" }
+      "input": [
+        {"type": "generator", "target": [0, 0], "pattern": "0000"},
+        {"type": "generator", "target": [0, 1], "pattern": "1000"}
       ],
       "expected": { "2,0": true, "2,1": false }
     },
     {
       "name": "set_then_reset",
       "comment": "S=1 で set → R=1(2 tick) で reset。Q=0。backward フィードバック遅延の安定化に2 tick のリセットパルスが必要",
-      "generators": [
-        { "target": [0, 0], "pattern": "0011000" },
-        { "target": [0, 1], "pattern": "1000000" }
+      "input": [
+        {"type": "generator", "target": [0, 0], "pattern": "0011000"},
+        {"type": "generator", "target": [0, 1], "pattern": "1000000"}
       ],
       "ticks": 7,
       "expected": { "2,0": false, "2,1": true }

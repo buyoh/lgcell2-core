@@ -1,8 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use lgcell2_core::base::ParseError;
-use lgcell2_core::circuit::{Circuit, Generator, Pos, Wire};
-use lgcell2_core::io::json::{CircuitJson, parse_pattern, parse_wire_kind};
+use lgcell2_core::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire};
+use lgcell2_core::io::json::{
+    CircuitJson, InputJson, OutputJson, parse_expected_pattern, parse_pattern, parse_wire_kind,
+};
 use lgcell2_core::simulation::Simulator;
 
 #[derive(serde::Deserialize)]
@@ -19,6 +21,10 @@ struct TestCase {
     #[serde(default)]
     initial: BTreeMap<String, bool>,
     #[serde(default)]
+    input: Vec<InputCaseJson>,
+    #[serde(default)]
+    output: Vec<OutputCaseJson>,
+    #[serde(default)]
     generators: Vec<GeneratorJson>,
     #[serde(default)]
     expected: BTreeMap<String, bool>,
@@ -30,6 +36,28 @@ struct GeneratorJson {
     pattern: String,
     #[serde(default, rename = "loop")]
     is_loop: bool,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum InputCaseJson {
+    Generator {
+        target: [i32; 2],
+        pattern: String,
+        #[serde(default, rename = "loop")]
+        is_loop: bool,
+    },
+}
+
+#[derive(serde::Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum OutputCaseJson {
+    Tester {
+        target: [i32; 2],
+        expected: String,
+        #[serde(default, rename = "loop")]
+        is_loop: bool,
+    },
 }
 
 /// シミュレーション型テストケースを実行する
@@ -62,8 +90,13 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
             )
         });
 
-    // 3. circuit.json の generator と case.generator を target 単位でマージ
-    let circuit = build_circuit_with_case_generators(&circuit_json, &test_case.generators)
+    // 3. circuit.json の input と case.input を target 単位でマージ
+    let circuit = build_circuit_with_case_inputs(
+        &circuit_json,
+        &test_case.input,
+        &test_case.output,
+        &test_case.generators,
+    )
         .unwrap_or_else(|e| panic!("Failed to build circuit for test case {}: {}", case_name, e));
 
     // 4. Simulator を作成して初期値を設定
@@ -79,7 +112,13 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
 
     // 5. ticks 回実行（case に指定があれば優先）
     let ticks = test_case.ticks.unwrap_or(check.ticks) as u64;
-    sim.run(ticks);
+    let mismatches = sim.run_with_verification(ticks);
+    assert!(
+        mismatches.is_empty(),
+        "Tester mismatches found in test case {}: {:?}",
+        case_name,
+        mismatches
+    );
 
     // 6. expected の各値を検証
     for (pos_str, expected_value) in &test_case.expected {
@@ -97,8 +136,10 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
     }
 }
 
-fn build_circuit_with_case_generators(
+fn build_circuit_with_case_inputs(
     circuit_json: &CircuitJson,
+    case_inputs: &[InputCaseJson],
+    case_outputs: &[OutputCaseJson],
     case_generators: &[GeneratorJson],
 ) -> Result<Circuit, ParseError> {
     let mut cells = BTreeSet::new();
@@ -114,22 +155,107 @@ fn build_circuit_with_case_generators(
         wires.push(Wire::new(src, dst, kind));
     }
 
-    let mut generators_by_target: BTreeMap<Pos, Generator> = BTreeMap::new();
+    let mut inputs_by_target: BTreeMap<Pos, Input> = BTreeMap::new();
+
+    for input in &circuit_json.input {
+        match input {
+            InputJson::Generator {
+                target,
+                pattern,
+                is_loop,
+            } => {
+                let target = Pos::new(target[0], target[1]);
+                let pattern = parse_pattern(pattern)?;
+                inputs_by_target.insert(
+                    target,
+                    Input::Generator(Generator::new(target, pattern, *is_loop)),
+                );
+            }
+        }
+    }
 
     for generator in &circuit_json.generators {
         let target = Pos::new(generator.target[0], generator.target[1]);
         let pattern = parse_pattern(&generator.pattern)?;
-        generators_by_target.insert(target, Generator::new(target, pattern, generator.is_loop));
+        inputs_by_target.insert(
+            target,
+            Input::Generator(Generator::new(target, pattern, generator.is_loop)),
+        );
+    }
+
+    for input in case_inputs {
+        match input {
+            InputCaseJson::Generator {
+                target,
+                pattern,
+                is_loop,
+            } => {
+                let target = Pos::new(target[0], target[1]);
+                let pattern = parse_pattern(pattern)?;
+                inputs_by_target.insert(
+                    target,
+                    Input::Generator(Generator::new(target, pattern, *is_loop)),
+                );
+            }
+        }
     }
 
     for generator in case_generators {
         let target = Pos::new(generator.target[0], generator.target[1]);
         let pattern = parse_pattern(&generator.pattern)?;
-        generators_by_target.insert(target, Generator::new(target, pattern, generator.is_loop));
+        inputs_by_target.insert(
+            target,
+            Input::Generator(Generator::new(target, pattern, generator.is_loop)),
+        );
     }
 
-    let generators = generators_by_target.into_values().collect::<Vec<_>>();
-    Circuit::with_generators(cells, wires, generators).map_err(ParseError::from)
+    let mut outputs_by_target: BTreeMap<Pos, Output> = BTreeMap::new();
+    for output in &circuit_json.output {
+        match output {
+            OutputJson::Tester {
+                target,
+                expected,
+                is_loop,
+            } => {
+                let target = Pos::new(target[0], target[1]);
+                let expected = parse_expected_pattern(expected)?;
+                outputs_by_target.insert(
+                    target,
+                    Output::Tester(Tester::new(target, expected, *is_loop)),
+                );
+            }
+        }
+    }
+
+    for tester in &circuit_json.testers {
+        let target = Pos::new(tester.target[0], tester.target[1]);
+        let expected = parse_expected_pattern(&tester.expected)?;
+        outputs_by_target.insert(
+            target,
+            Output::Tester(Tester::new(target, expected, tester.is_loop)),
+        );
+    }
+
+    for output in case_outputs {
+        match output {
+            OutputCaseJson::Tester {
+                target,
+                expected,
+                is_loop,
+            } => {
+                let target = Pos::new(target[0], target[1]);
+                let expected = parse_expected_pattern(expected)?;
+                outputs_by_target.insert(
+                    target,
+                    Output::Tester(Tester::new(target, expected, *is_loop)),
+                );
+            }
+        }
+    }
+
+    let inputs = inputs_by_target.into_values().collect::<Vec<_>>();
+    let outputs = outputs_by_target.into_values().collect::<Vec<_>>();
+    Circuit::with_components(cells, wires, inputs, outputs).map_err(ParseError::from)
 }
 
 fn parse_pos(pos_str: &str) -> Pos {

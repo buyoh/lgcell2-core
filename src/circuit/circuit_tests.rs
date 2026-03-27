@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
+use crate::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire, WireKind};
 
 fn sample_cells() -> BTreeSet<Pos> {
     BTreeSet::from([Pos::new(0, 0), Pos::new(1, 0), Pos::new(2, 0)])
@@ -123,13 +123,17 @@ fn circuit_with_generators_adds_targets_to_cells() {
         Pos::new(1, 0),
         WireKind::Positive,
     )];
-    let generators = vec![Generator::new(Pos::new(9, 9), vec![true], false)];
+    let inputs = vec![Input::Generator(Generator::new(
+        Pos::new(9, 9),
+        vec![true],
+        false,
+    ))];
 
     let circuit =
-        Circuit::with_generators(cells, wires, generators).expect("circuit must be valid");
+        Circuit::with_components(cells, wires, inputs, Vec::new()).expect("circuit must be valid");
 
     assert!(circuit.cells().contains(&Pos::new(9, 9)));
-    assert_eq!(circuit.generators().len(), 1);
+    assert_eq!(circuit.inputs().len(), 1);
 }
 
 #[test]
@@ -140,13 +144,17 @@ fn circuit_rejects_generator_target_with_incoming_wire() {
         Pos::new(2, 0),
         WireKind::Positive,
     )];
-    let generators = vec![Generator::new(Pos::new(2, 0), vec![true], false)];
+    let inputs = vec![Input::Generator(Generator::new(
+        Pos::new(2, 0),
+        vec![true],
+        false,
+    ))];
 
-    let err = Circuit::with_generators(cells, wires, generators)
-        .expect_err("must reject generator on incoming target");
+    let err = Circuit::with_components(cells, wires, inputs, Vec::new())
+        .expect_err("must reject input on incoming target");
     assert!(matches!(
         err,
-        crate::base::CircuitError::GeneratorTargetHasIncomingWires(Pos { x: 2, y: 0 })
+        crate::base::CircuitError::InputTargetHasIncomingWires(Pos { x: 2, y: 0 })
     ));
 }
 
@@ -158,16 +166,16 @@ fn circuit_rejects_duplicate_generator_target() {
         Pos::new(1, 0),
         WireKind::Positive,
     )];
-    let generators = vec![
-        Generator::new(Pos::new(2, 0), vec![true], false),
-        Generator::new(Pos::new(2, 0), vec![false], true),
+    let inputs = vec![
+        Input::Generator(Generator::new(Pos::new(2, 0), vec![true], false)),
+        Input::Generator(Generator::new(Pos::new(2, 0), vec![false], true)),
     ];
 
-    let err = Circuit::with_generators(cells, wires, generators)
-        .expect_err("must reject duplicate generator target");
+    let err = Circuit::with_components(cells, wires, inputs, Vec::new())
+        .expect_err("must reject duplicate input target");
     assert!(matches!(
         err,
-        crate::base::CircuitError::DuplicateGeneratorTarget(Pos { x: 2, y: 0 })
+        crate::base::CircuitError::DuplicateInputTarget(Pos { x: 2, y: 0 })
     ));
 }
 
@@ -179,12 +187,55 @@ fn circuit_rejects_empty_generator_pattern() {
         Pos::new(1, 0),
         WireKind::Positive,
     )];
-    let generators = vec![Generator::new(Pos::new(2, 0), Vec::new(), false)];
+    let inputs = vec![Input::Generator(Generator::new(
+        Pos::new(2, 0),
+        Vec::new(),
+        false,
+    ))];
 
-    let err = Circuit::with_generators(cells, wires, generators)
+    let err = Circuit::with_components(cells, wires, inputs, Vec::new())
         .expect_err("must reject empty generator pattern");
     assert!(matches!(
         err,
         crate::base::CircuitError::EmptyGeneratorPattern(Pos { x: 2, y: 0 })
+    ));
+}
+
+#[test]
+fn circuit_rejects_duplicate_output_target() {
+    let cells = sample_cells();
+    let wires = vec![Wire::new(
+        Pos::new(0, 0),
+        Pos::new(1, 0),
+        WireKind::Positive,
+    )];
+    let outputs = vec![
+        Output::Tester(Tester::new(Pos::new(1, 0), vec![Some(true)], false)),
+        Output::Tester(Tester::new(Pos::new(1, 0), vec![Some(false)], false)),
+    ];
+
+    let err = Circuit::with_components(cells, wires, Vec::new(), outputs)
+        .expect_err("must reject duplicate output target");
+    assert!(matches!(
+        err,
+        crate::base::CircuitError::DuplicateOutputTarget(Pos { x: 1, y: 0 })
+    ));
+}
+
+#[test]
+fn circuit_rejects_empty_tester_pattern() {
+    let cells = sample_cells();
+    let wires = vec![Wire::new(
+        Pos::new(0, 0),
+        Pos::new(1, 0),
+        WireKind::Positive,
+    )];
+    let outputs = vec![Output::Tester(Tester::new(Pos::new(1, 0), Vec::new(), false))];
+
+    let err = Circuit::with_components(cells, wires, Vec::new(), outputs)
+        .expect_err("must reject empty tester pattern");
+    assert!(matches!(
+        err,
+        crate::base::CircuitError::EmptyTesterPattern(Pos { x: 1, y: 0 })
     ));
 }

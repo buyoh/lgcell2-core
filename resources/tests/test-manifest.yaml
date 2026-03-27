@@ -8,6 +8,11 @@ tests:
     path: simulation/generator/generator_pattern
     comment: "ジェネレーターのパターン適用と case override"
 
+  - name: tester_basic
+    type: simulation
+    path: simulation/output/tester_basic
+    comment: "Tester による tick ごとの期待値検証"
+
   # === ワイヤ動作テスト ===
   - name: eight_directions
     type: simulation
@@ -81,6 +86,16 @@ tests:
     type: parse_error
     path: parse_error/generator_invalid_pattern_char
     comment: "Invalid generator pattern character is rejected"
+
+  - name: validation_tester_invalid_expected_pattern_char
+    type: parse_error
+    path: parse_error/tester_invalid_expected_pattern_char
+    comment: "Invalid tester expected pattern character is rejected"
+
+  - name: validation_tester_duplicate_target
+    type: parse_error
+    path: parse_error/tester_duplicate_target
+    comment: "Duplicate tester target is rejected"
 
   # === 総合テスト ===
   - name: sr_latch

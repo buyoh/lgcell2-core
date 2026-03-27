@@ -2,8 +2,8 @@
   "wires": [
     { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
   ],
-  "generators": [
-    { "target": [2, 0], "pattern": "1" },
-    { "target": [2, 0], "pattern": "0" }
+  "input": [
+    {"type": "generator", "target": [2, 0], "pattern": "1"},
+    {"type": "generator", "target": [2, 0], "pattern": "0"}
   ]
 }

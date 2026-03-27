@@ -1,4 +1,4 @@
-use crate::circuit::Pos;
+use crate::circuit::{InputComponent, Pos};
 
 /// tick ごとに指定パターンで値を注入するジェネレーター。
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -43,6 +43,16 @@ impl Generator {
         } else {
             self.pattern[tick.min(len - 1) as usize]
         }
+    }
+}
+
+impl InputComponent for Generator {
+    fn target(&self) -> Pos {
+        self.target()
+    }
+
+    fn value_at(&self, tick: u64) -> bool {
+        self.value_at(tick)
     }
 }
 

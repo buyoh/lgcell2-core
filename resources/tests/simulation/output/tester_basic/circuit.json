@@ -1,0 +1,11 @@
+{
+  "wires": [
+    { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
+  ],
+  "input": [
+    { "type": "generator", "target": [0, 0], "pattern": "10", "loop": true }
+  ],
+  "output": [
+    { "type": "tester", "target": [1, 0], "expected": "10", "loop": true }
+  ]
+}
