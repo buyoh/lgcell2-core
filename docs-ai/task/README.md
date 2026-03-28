@@ -1,14 +1,10 @@
 # タスク一覧
 
-作業中・設計完了（未実装）のタスクのインデックス。
+## 作業中
 
-## 作業中 / 未着手
-
-| タスク | ステータス | 概要 |
-|---|---|---|
-| [コードレビュー 2026-03-26](./code-review-2026-03-26.md) | 未着手 | ソースコード・テスト・設定の問題点を調査・修正 |
-| [インタラクティブモード](./interactive-cli.md) | 設計完了（未実装）| `--interactive` フラグによるコマンドベースの対話型CLI |
-| [セルマージ最適化](./cell-merge-optimization.md) | 設計完了（未実装）| Union-Find による即時伝搬セルの集約でシミュレーション高速化 |
-| [冗長ソート除去](./remove-redundant-sort.md) | 完了 | `simulate_to_output_json` の毎 tick ソートを除去 |
-| [サブ回路](./sub-circuit/README.md) | 設計完了（未実装）| 再利用可能な回路テンプレートの導入 |
-| [ワイヤ状態モデルによるシミュレーション再設計](./wire-state-simulation/README.md) | 設計中 | シミュレーション内部状態を「セル状態」から「ワイヤ状態」へ移行し、共通トレイトを定義 |
+- [wire-state-simulation/](wire-state-simulation/README.md) — ワイヤ状態モデルによるシミュレーション再設計
+- [sub-circuit/](sub-circuit/README.md) — サブ回路（再利用可能な回路テンプレート）
+- [interactive-cli.md](interactive-cli.md) — インタラクティブ CLI
+- [cell-merge-optimization.md](cell-merge-optimization.md) — セルマージ最適化
+- [code-review-2026-03-26.md](code-review-2026-03-26.md) — コードレビュー
+- [remove-redundant-sort.md](remove-redundant-sort.md) — 冗長ソート除去
