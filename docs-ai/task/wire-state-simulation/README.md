@@ -1,6 +1,6 @@
 # ワイヤ状態モデルによるシミュレーション再設計
 
-シミュレーション状態の保持単位を「セル」から「遅延ワイヤ」に変更し、概念の明確化とメモリ効率を改善する。旧実装は互換のため残し、共通 trait でインターフェースを統一する。
+シミュレーション状態の保持単位を「セル」から「遅延ワイヤ」に変更し、概念の明確化とメモリ効率を改善する。旧実装（`Simulator`）は `WireSimulator` で完全に置き換える。
 
 作成日: 2026-03-28
 ステータス: 設計中
@@ -115,20 +115,20 @@ cell_pos_to_index: HashMap<Pos, usize>  // 構築時に計算
 
 `cell_values[index]` での O(1) アクセスにより、HashMap のオーバーヘッドを排除する。
 
-### trait による共通化
+### 旧実装との関係
 
-旧実装（`Simulator`）と新実装（`WireSimulator`）で共通のインターフェースを定義する。
+旧 `Simulator` / `SimState` は削除し、`WireSimulator` / `WireSimState` で完全に置き換える。
 
 詳細は [trait-design.md](trait-design.md) を参照。
 
 ### 公開 API の互換性
 
-`WasmSimulator`, `io::json`, CLI 等の利用側は trait 経由でアクセスする。既存の `SimState` を返す API は、新モデルではオンデマンドで `cell_values` から `SimState` を構築するアダプタを提供する。
+`WasmSimulator`, `io::json`, CLI 等の利用側は `WireSimulator` を直接使用するよう更新する。`SimState` 型は廃止し、セル値の参照には `get_cell()` / `cell_values()` を用いる。
 
 ## ステップ
 
-1. **共通 trait の定義**: `SimulatorEngine` trait を定義し、旧 `Simulator` に実装（[trait-design.md](trait-design.md)）
-2. **`WireSimState` の実装**: 遅延ワイヤベースの状態管理（[wire-sim-state.md](wire-sim-state.md)）
-3. **`WireSimulator` の実装**: ワイヤ状態モデルのシミュレーションエンジン（[wire-simulator.md](wire-simulator.md)）
-4. **利用側の移行**: `WasmSimulator`, `io::json`, CLI を trait ベースに切り替え
-5. **テスト**: 旧実装と新実装の出力一致を検証するクロステスト
+1. **`WireSimState` の実装**: 遅延ワイヤベースの状態管理（[wire-sim-state.md](wire-sim-state.md)）
+2. **`WireSimulator` の実装**: ワイヤ状態モデルのシミュレーションエンジン（[wire-simulator.md](wire-simulator.md)）
+3. **利用側の移行**: `WasmSimulator`, `io::json`, CLI を `WireSimulator` へ直接切り替え（[trait-design.md](trait-design.md)）
+4. **旧実装の削除**: `Simulator`, `SimState`, `StateMut` を削除
+5. **テスト**: テストマニフェスト・エンジンテストで `WireSimulator` を検証

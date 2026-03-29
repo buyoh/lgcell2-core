@@ -179,28 +179,11 @@ fn set_cell(&mut self, pos: Pos, value: bool) -> Result<(), SimulationError> {
 
 `set_cell()` は `cell_values` と `wire_state` の両方を同期的に更新する。これにより、tick 開始前のどのタイミングで呼ばれても一貫した状態が保たれる。
 
-## 現行 `Simulator` との等価性
+## テスト方針
 
-同一回路で `Simulator` と `WireSimulator` を実行した場合、全 tick の全セル値は完全に一致する。これをクロステストで検証する。
+`WireSimulator` はテストマニフェスト（`resources/tests/test-manifest.yaml`）を使い、エンジンテストで検証する。旧 `Simulator` との出力比較（クロステスト）は行わない。
 
-```rust
-#[test]
-fn wire_simulator_matches_cell_simulator() {
-    let circuit = /* テスト回路 */;
-    let mut old = Simulator::new(circuit.clone());
-    let mut new = WireSimulator::new(circuit);
-
-    for _ in 0..100 {
-        old.tick();
-        new.tick();
-        for &pos in old.circuit().sorted_cells() {
-            assert_eq!(
-                old.state().get(pos),
-                new.get_cell(pos),
-                "mismatch at tick {} pos {:?}",
-                old.current_tick(), pos
-            );
-        }
-    }
-}
-```
+テスト観点:
+- tick 処理ごとのセル値がテストマニフェストの期待値と一致すること
+- 遅延ワイヤ（後方ワイヤ）を含む回路での伝搬が正しいこと
+- `set_cell()` / `get_cell()` が tick 前後で一貫した値を返すこと
