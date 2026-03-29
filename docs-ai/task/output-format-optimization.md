@@ -3,7 +3,13 @@
 タスクの概要: `OutputFormat` 導入後も `cell_values()` / `get_cell()` など全セル前提の API が残存しており、内部で全セル値を保持し続ける必要がある状態を解消する。出力のキャッシュと Tick リプレイ機能を追加し、将来の ViewPort 最適化の基盤を作る。
 
 作成日: 2026-03-29
-ステータス: 設計完了（未実装）
+ステータス: 実装中
+
+## 進捗
+
+- 2026-03-29: phase1 を実装。`Simulator::cell_values()` と `Simulator::get_cell()` を削除し、呼び出し元を `last_output()` ベースに移行した
+- 2026-03-29: phase1 を成立させる前提として `last_output` キャッシュと `replay_tick()` を先行導入した
+- 2026-03-29: `TickOutput.tick` と JSON 出力の tick 番号を completed tick の 0-based インデックスに統一した
 
 ## 背景・動機
 
@@ -134,10 +140,19 @@ assert_eq!(snapshots[0].tick, 0);
 
 ## ステップ
 
-1. **Simulator に `last_output` フィールド追加**: コンストラクタで初期化、`complete_tick()` でキャッシュ更新
-2. **`replay_tick()` 追加**: `build_output()` 再呼び出しによる出力再構築
-3. **`last_output()` アクセサ追加**: `&TickOutput` を返す
-4. **`cell_values()` 削除**: view.rs、wasm_api、テストの呼び出し元を更新
-5. **`get_cell()` 削除**: テスト、wasm_api の呼び出し元を更新
-6. **`TickOutput.tick` の意味を整理**: 0-based 化、テスト・JSON 出力の修正
-7. **`run_with_snapshots()` 修正**: キャッシュから clone する方式に変更
+### フェーズ 1: API の削除
+
+1. [x] **`cell_values()` 削除**: view.rs、wasm_api、テストの呼び出し元を更新
+2. [x] **`get_cell()` 削除**: テスト、wasm_api の呼び出し元を更新
+
+### フェーズ 2: 新しい API の追加（再構築など）
+
+3. [x] **Simulator に `last_output` フィールド追加**: コンストラクタで初期化、`complete_tick()` でキャッシュ更新
+4. [x] **`last_output()` アクセサ追加**: `&TickOutput` を返す
+5. [x] **`replay_tick()` 追加**: `build_output()` 再呼び出しによる出力再構築
+6. [x] **`TickOutput.tick` の意味を整理**: 0-based 化、テスト・JSON 出力の修正
+7. [x] **呼び出し元を新 API に移行**: view.rs、wasm_api が `last_output()` を使用するよう更新
+
+### フェーズ 3: 高速化対応
+
+8. **`run_with_snapshots()` 修正**: キャッシュから clone する方式に変更し、都度の `build_output()` 呼び出しを排除

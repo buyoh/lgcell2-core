@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 mod tests {
     use std::cell::RefCell;
@@ -146,7 +145,7 @@ mod tests {
 
         assert!(result.is_ok());
         let borrowed = data.borrow();
-        assert!(borrowed.frames.iter().any(|frame| frame.contains("tick:1")));
+        assert!(borrowed.frames.iter().any(|frame| frame.contains("tick:0")));
     }
 
     #[test]

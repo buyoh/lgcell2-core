@@ -47,6 +47,7 @@ pub struct Simulator {
     cell_pos_to_index: HashMap<Pos, usize>,
     tick: u64,
     cell_index: usize,
+    last_output: TickOutput,
     output_format: OutputFormat,
 }
 
@@ -65,6 +66,24 @@ impl Simulator {
             .enumerate()
             .map(|(index, &pos)| (pos, index))
             .collect::<HashMap<_, _>>();
+        let last_output = TickOutput {
+            tick: 0,
+            cells: match &output_format {
+                OutputFormat::AllCell => circuit
+                    .sorted_cells()
+                    .iter()
+                    .copied()
+                    .map(|pos| (pos, false))
+                    .collect(),
+                OutputFormat::ViewPort(rects) => circuit
+                    .sorted_cells()
+                    .iter()
+                    .copied()
+                    .filter(|pos| rects.iter().any(|rect| rect.contains(*pos)))
+                    .map(|pos| (pos, false))
+                    .collect(),
+            },
+        };
 
         Self {
             wire_state: WireSimState::from_circuit(&circuit),
@@ -73,6 +92,7 @@ impl Simulator {
             cell_pos_to_index,
             tick: 0,
             cell_index: 0,
+            last_output,
             output_format,
         }
     }
@@ -98,12 +118,21 @@ impl Simulator {
 
         for (cell_idx, &pos) in self.circuit.sorted_cells().iter().enumerate() {
             if self.circuit.incoming_indices(pos).is_empty()
-                && !self.circuit.inputs().iter().any(|input| input.target() == pos)
+                && !self
+                    .circuit
+                    .inputs()
+                    .iter()
+                    .any(|input| input.target() == pos)
             {
-                self.wire_state.update_cell(cell_idx, self.cell_values[cell_idx]);
+                self.wire_state
+                    .update_cell(cell_idx, self.cell_values[cell_idx]);
             }
         }
 
+        // Bug fix: last_output used to be rebuilt after tick increment, which made snapshot
+        // numbering 1-based and disconnected from verify_testers(). Rebuilding here keeps both
+        // the cache and the completed tick index aligned.
+        self.last_output = self.build_output();
         self.cell_index = 0;
         self.tick += 1;
     }
@@ -194,7 +223,7 @@ impl Simulator {
         let mut snapshots = Vec::with_capacity(ticks as usize);
         for _ in 0..ticks {
             self.tick();
-            snapshots.push(self.build_output());
+            snapshots.push(self.last_output.clone());
         }
         snapshots
     }
@@ -244,13 +273,6 @@ impl Simulator {
         &self.circuit
     }
 
-    /// 指定セルの現在値を取得する。
-    pub fn get_cell(&self, pos: Pos) -> Option<bool> {
-        self.cell_pos_to_index
-            .get(&pos)
-            .map(|&index| self.cell_values[index])
-    }
-
     /// 指定セルの値を更新する。
     pub fn set_cell(&mut self, pos: Pos, value: bool) -> Result<(), SimulationError> {
         let index = self
@@ -267,17 +289,21 @@ impl Simulator {
             }
         }
 
+        // Bug fix: callers switched from direct cell accessors to last_output(), so injected
+        // values must immediately refresh the cache instead of waiting for the next tick.
+        self.replay_tick();
+
         Ok(())
     }
 
-    /// 現在の全セル値を返す。
-    pub fn cell_values(&self) -> HashMap<Pos, bool> {
-        self.circuit
-            .sorted_cells()
-            .iter()
-            .enumerate()
-            .map(|(index, &pos)| (pos, self.cell_values[index]))
-            .collect()
+    /// 現在の出力キャッシュを返す。
+    pub fn last_output(&self) -> &TickOutput {
+        &self.last_output
+    }
+
+    /// 現在の状態から出力キャッシュを再構築する。
+    pub fn replay_tick(&mut self) {
+        self.last_output = self.build_output();
     }
 
     /// 現在の tick 番号を取得する。
@@ -290,7 +316,7 @@ impl Simulator {
         self.circuit.sorted_cells().get(self.cell_index).copied()
     }
 
-    /// 出力形式を変更する。次の tick 完了から反映される。
+    /// 出力形式を変更する。即時反映したい場合は `replay_tick()` を呼ぶ。
     pub fn set_output_format(&mut self, output_format: OutputFormat) {
         self.output_format = output_format;
     }

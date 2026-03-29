@@ -1,7 +1,11 @@
 use std::collections::BTreeSet;
 
 use crate::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire, WireKind};
-use crate::simulation::{OutputFormat, Rect, StepResult, Simulator};
+use crate::simulation::{OutputFormat, Rect, Simulator, StepResult};
+
+fn output_cell(sim: &Simulator, pos: Pos) -> Option<bool> {
+    sim.last_output().cells.get(&pos).copied()
+}
 
 fn make_circuit(cells: &[Pos], wires: Vec<Wire>) -> Circuit {
     Circuit::new(BTreeSet::from_iter(cells.iter().copied()), wires).expect("valid circuit")
@@ -31,8 +35,13 @@ fn make_circuit_with_components(
     inputs: Vec<Input>,
     outputs: Vec<Output>,
 ) -> Circuit {
-    Circuit::with_components(BTreeSet::from_iter(cells.iter().copied()), wires, inputs, outputs)
-        .expect("valid circuit")
+    Circuit::with_components(
+        BTreeSet::from_iter(cells.iter().copied()),
+        wires,
+        inputs,
+        outputs,
+    )
+    .expect("valid circuit")
 }
 
 #[test]
@@ -48,8 +57,8 @@ fn positive_chain_propagates_within_one_tick() {
     let mut sim = Simulator::new(circuit);
     sim.tick();
 
-    assert_eq!(sim.get_cell(Pos::new(1, 0)), Some(false));
-    assert_eq!(sim.get_cell(Pos::new(2, 0)), Some(false));
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(false));
+    assert_eq!(output_cell(&sim, Pos::new(2, 0)), Some(false));
 }
 
 #[test]
@@ -65,7 +74,7 @@ fn backward_wire_is_delayed_by_one_tick() {
 
     let mut sim = Simulator::new(circuit);
     sim.tick();
-    assert_eq!(sim.get_cell(Pos::new(0, 0)), Some(false));
+    assert_eq!(output_cell(&sim, Pos::new(0, 0)), Some(false));
 }
 
 #[test]
@@ -80,7 +89,7 @@ fn nand_is_constructed_by_two_negative_wires() {
 
     let mut sim = Simulator::new(circuit);
     sim.tick();
-    assert_eq!(sim.get_cell(Pos::new(2, 0)), Some(true));
+    assert_eq!(output_cell(&sim, Pos::new(2, 0)), Some(true));
 }
 
 #[test]
@@ -102,7 +111,7 @@ fn step_can_pause_and_resume_without_behavior_change() {
     assert_eq!(by_step.step(), StepResult::Continue);
     assert_eq!(by_step.step(), StepResult::TickComplete);
 
-    assert_eq!(by_tick.cell_values(), by_step.cell_values());
+    assert_eq!(by_tick.last_output(), by_step.last_output());
 }
 
 #[test]
@@ -123,8 +132,8 @@ fn run_with_snapshots_collects_tick_states() {
     let snapshots = sim.run_with_snapshots(2);
 
     assert_eq!(snapshots.len(), 2);
-    assert_eq!(snapshots[0].tick, 1);
-    assert_eq!(snapshots[1].tick, 2);
+    assert_eq!(snapshots[0].tick, 0);
+    assert_eq!(snapshots[1].tick, 1);
     assert_eq!(snapshots[0].cells.get(&Pos::new(0, 0)), Some(&true));
     assert_eq!(snapshots[0].cells.get(&Pos::new(1, 0)), Some(&true));
 }
@@ -152,6 +161,44 @@ fn viewport_snapshot_filters_cells() {
 }
 
 #[test]
+fn set_cell_updates_last_output_immediately() {
+    let circuit = make_circuit(&[Pos::new(0, 0)], vec![]);
+
+    let mut sim = Simulator::new(circuit);
+    sim.set_cell(Pos::new(0, 0), true)
+        .expect("state update must succeed");
+
+    assert_eq!(output_cell(&sim, Pos::new(0, 0)), Some(true));
+}
+
+#[test]
+fn replay_tick_rebuilds_output_after_output_format_change() {
+    let circuit = make_circuit(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(
+            Pos::new(0, 0),
+            Pos::new(1, 0),
+            WireKind::Positive,
+        )],
+    );
+
+    let mut sim = Simulator::new(circuit);
+    sim.set_cell(Pos::new(0, 0), true)
+        .expect("state update must succeed");
+    sim.set_output_format(OutputFormat::ViewPort(vec![Rect::new(
+        Pos::new(1, 0),
+        Pos::new(1, 0),
+    )]));
+
+    assert_eq!(sim.last_output().cells.len(), 2);
+
+    sim.replay_tick();
+
+    assert_eq!(sim.last_output().cells.len(), 1);
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(false));
+}
+
+#[test]
 fn generator_non_loop_holds_last_value() {
     let circuit = make_circuit_with_generators(
         &[Pos::new(0, 0), Pos::new(1, 0)],
@@ -166,7 +213,7 @@ fn generator_non_loop_holds_last_value() {
     let mut sim = Simulator::new(circuit);
     sim.run(3);
 
-    assert_eq!(sim.get_cell(Pos::new(1, 0)), Some(false));
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(false));
 }
 
 #[test]
@@ -184,7 +231,7 @@ fn generator_loop_repeats_pattern() {
     let mut sim = Simulator::new(circuit);
     sim.run(3);
 
-    assert_eq!(sim.get_cell(Pos::new(1, 0)), Some(true));
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(true));
 }
 
 #[test]
@@ -203,7 +250,7 @@ fn generator_is_applied_when_stepping_cell_by_cell() {
     assert_eq!(sim.step(), StepResult::Continue);
     assert_eq!(sim.step(), StepResult::TickComplete);
 
-    assert_eq!(sim.get_cell(Pos::new(1, 0)), Some(true));
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(true));
 }
 
 #[test]

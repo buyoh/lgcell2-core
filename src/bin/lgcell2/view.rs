@@ -90,15 +90,9 @@ fn render_once<C: Console>(
     simulator: &Simulator,
     paused: bool,
 ) -> Result<(), String> {
-    let state = simulator.cell_values();
+    let output = simulator.last_output();
     let (cols, rows) = console.size()?;
-    let frame = renderer.render_frame(
-        &state,
-        simulator.current_tick(),
-        paused,
-        cols,
-        rows,
-    );
+    let frame = renderer.render_frame(&output.cells, output.tick, paused, cols, rows);
     console.write_frame(&frame)
 }
 

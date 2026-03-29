@@ -2,12 +2,14 @@ use std::collections::BTreeSet;
 
 use wasm_bindgen::prelude::*;
 
+use crate::base::SimulationError;
 use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 use crate::io::json::{parse_circuit_json, parse_pattern};
-use crate::base::SimulationError;
-use crate::simulation::{StepResult, Simulator};
+use crate::simulation::{Simulator, StepResult};
 
-use super::types::{WasmCellState, WasmCircuitInput, WasmTickResult, WasmWireKind, WasmStepRunResult};
+use super::types::{
+    WasmCellState, WasmCircuitInput, WasmStepRunResult, WasmTickResult, WasmWireKind,
+};
 
 /// JavaScript から利用可能なステートフルシミュレータ。
 /// 内部に `Simulator` を保持するオパーク型。
@@ -82,7 +84,7 @@ impl WasmSimulator {
     #[wasm_bindgen(js_name = "getCell")]
     pub fn get_cell(&self, x: i32, y: i32) -> Option<bool> {
         let pos = Pos::new(x, y);
-        self.simulator.get_cell(pos)
+        self.simulator.last_output().cells.get(&pos).copied()
     }
 
     /// 指定セルの値を設定する（入力注入用）。
@@ -97,15 +99,17 @@ impl WasmSimulator {
     // ---- 内部ヘルパー ----
 
     fn build_cell_states(&self) -> Vec<WasmCellState> {
-        let state = self.simulator.cell_values();
+        let output = self.simulator.last_output();
         self.simulator
             .circuit()
             .sorted_cells()
             .iter()
-            .map(|pos| WasmCellState {
-                x: pos.x,
-                y: pos.y,
-                value: state.get(pos).copied().unwrap_or(false),
+            .filter_map(|pos| {
+                output.cells.get(pos).map(|&value| WasmCellState {
+                    x: pos.x,
+                    y: pos.y,
+                    value,
+                })
             })
             .collect()
     }
@@ -138,8 +142,7 @@ fn build_circuit_from_input(input: WasmCircuitInput) -> Result<Circuit, crate::b
     let mut generators = Vec::with_capacity(input.generators.len());
     for gen_input in input.generators {
         let target = Pos::new(gen_input.target[0], gen_input.target[1]);
-        let pattern = parse_pattern(&gen_input.pattern)
-            .map_err(crate::base::ParseError::from)?;
+        let pattern = parse_pattern(&gen_input.pattern).map_err(crate::base::ParseError::from)?;
         generators.push(Generator::new(target, pattern, gen_input.is_loop));
     }
 

@@ -14,12 +14,12 @@ fn make_state(cells: &[(i32, i32)], on_cells: &[(i32, i32)]) -> HashMap<Pos, boo
     let mut sim = Simulator::new(circuit);
 
     for (x, y) in on_cells {
-        sim
-            .set_cell(Pos::new(*x, *y), true)
+        sim.set_cell(Pos::new(*x, *y), true)
             .expect("cell should exist in state");
     }
 
-    sim.cell_values()
+    sim.replay_tick();
+    sim.last_output().cells.clone()
 }
 
 #[test]

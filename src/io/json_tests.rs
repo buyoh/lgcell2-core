@@ -3,6 +3,10 @@ use crate::io::json::{
 };
 use crate::simulation::Simulator;
 
+fn output_cell(sim: &Simulator, pos: crate::circuit::Pos) -> Option<bool> {
+    sim.last_output().cells.get(&pos).copied()
+}
+
 #[test]
 fn parse_valid_json_to_circuit() {
     let input = r#"
@@ -18,7 +22,10 @@ fn parse_valid_json_to_circuit() {
     sim.tick();
 
     // src=0,0 は初期値 false → Negative で反転 → true
-    assert_eq!(sim.get_cell(crate::circuit::Pos::new(1, 0)), Some(true));
+    assert_eq!(
+        output_cell(&sim, crate::circuit::Pos::new(1, 0)),
+        Some(true)
+    );
 }
 
 #[test]
@@ -93,7 +100,7 @@ fn output_json_has_expected_shape() {
     let text = output_json_to_string(&output).expect("serialization must succeed");
 
     assert!(text.contains("\"ticks\""));
-    assert!(text.contains("\"tick\": 1"));
+    assert!(text.contains("\"tick\": 0"));
     assert!(text.contains("\"0,0\": 0"));
     assert!(text.contains("\"1,0\": 1"));
 }
@@ -185,8 +192,8 @@ fn circuit_json_deserializes_without_generators() {
     assert!(parsed.generators.is_empty());
 }
 
-  #[test]
-  fn circuit_json_deserializes_legacy_generators_for_compatibility() {
+#[test]
+fn circuit_json_deserializes_legacy_generators_for_compatibility() {
     let input = r#"
     {
       "wires": [],
@@ -198,18 +205,18 @@ fn circuit_json_deserializes_without_generators() {
 
     let parsed: CircuitJson = serde_json::from_str(input).expect("must deserialize");
     assert_eq!(parsed.generators.len(), 1);
-  }
+}
 
-  #[test]
-  fn parse_expected_pattern_returns_invalid_expected_pattern_char_error() {
+#[test]
+fn parse_expected_pattern_returns_invalid_expected_pattern_char_error() {
     use crate::io::json::parse_expected_pattern;
 
     let err = parse_expected_pattern("10a").expect_err("must reject invalid expected pattern");
     assert!(matches!(
-      err,
-      crate::base::FormatError::InvalidExpectedPatternChar('a')
+        err,
+        crate::base::FormatError::InvalidExpectedPatternChar('a')
     ));
-  }
+}
 
 #[test]
 fn parse_wire_kind_returns_format_error() {

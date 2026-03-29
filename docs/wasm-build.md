@@ -81,6 +81,7 @@ wasm-pack build --dev --out-dir pkg-dev --target bundler --no-default-features -
 const result = simulate(circuitJson, 3n);
 const parsed = JSON.parse(result);
 // parsed.ticks: Array — 各 tick のセル状態
+// parsed.ticks[0].tick === 0
 ```
 
 ### `simulate_n(circuit_json: string, ticks: number): string`

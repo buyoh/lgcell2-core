@@ -97,7 +97,7 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
         &test_case.output,
         &test_case.generators,
     )
-        .unwrap_or_else(|e| panic!("Failed to build circuit for test case {}: {}", case_name, e));
+    .unwrap_or_else(|e| panic!("Failed to build circuit for test case {}: {}", case_name, e));
 
     // 4. Simulator を作成して初期値を設定
     let mut sim = Simulator::new(circuit);
@@ -124,7 +124,10 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
         let pos = parse_pos(pos_str);
 
         let actual_value = sim
-            .get_cell(pos)
+            .last_output()
+            .cells
+            .get(&pos)
+            .copied()
             .unwrap_or_else(|| panic!("Failed to get value at {}", pos_str));
         assert_eq!(
             actual_value, *expected_value,

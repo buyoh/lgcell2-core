@@ -68,10 +68,11 @@ circuit ──→ (外部依存なし)
   - `run(n)`: n tick 実行
   - `run_with_snapshots(n)`: 各 tick の `TickOutput` を収集
   - `run_with_verification(n)`: 各 tick のテスター検証結果を収集
-  - `get_cell()` / `set_cell()`: セル値の取得・設定
-  - `cell_values()`: 全セル値を `HashMap<Pos, bool>` で返す
+  - `set_cell()`: セル値を更新し、出力キャッシュも同期する
+  - `last_output()`: 直近の `TickOutput` を返す
+  - `replay_tick()`: 現在状態から出力キャッシュを再構築する
 - **`StepResult`**: `Continue`（tick 内に未処理セルあり）/ `TickComplete`（tick 完了）
-- **`TickOutput`**: tick 番号とセル値の `HashMap<Pos, bool>`。`OutputFormat` に応じて全セルまたは矩形領域内のセルのみを含む
+- **`TickOutput`**: 完了済み tick の 0-based 番号とセル値の `HashMap<Pos, bool>`。`OutputFormat` に応じて全セルまたは矩形領域内のセルのみを含む
 - **`OutputFormat`**: `AllCell`（全セル）/ `ViewPort(Vec<Rect>)`（矩形領域内のみ）
 
 **シミュレーション伝搬ルール:**
