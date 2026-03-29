@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::base::{FormatError, ParseError};
 use crate::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire, WireKind};
-use crate::simulation::Simulator;
+use crate::simulation::WireSimulator;
 
 /// 回路 JSON 全体を表す入力モデル。
 #[derive(Debug, Deserialize)]
@@ -194,13 +194,13 @@ pub fn parse_circuit_json(input: &str) -> Result<Circuit, ParseError> {
 
 /// 回路を指定 tick だけ実行した結果を JSON モデルとして返す。
 pub fn simulate_to_output_json(circuit: Circuit, ticks: u64) -> SimulationOutputJson {
-    let mut simulator = Simulator::new(circuit);
+    let mut simulator = WireSimulator::new(circuit);
     let snapshots = simulator.run_with_snapshots(ticks);
     let mut results = Vec::with_capacity(snapshots.len());
 
     for snapshot in snapshots {
         let mut cells = BTreeMap::new();
-        for (pos, value) in snapshot.cells {
+        for (&pos, &value) in &snapshot.cells {
             cells.insert(pos_to_json_key(pos), u8::from(value));
         }
 

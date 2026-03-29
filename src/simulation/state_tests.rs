@@ -1,45 +1,60 @@
 use std::collections::BTreeSet;
 
-use crate::circuit::{Circuit, Pos};
-use crate::simulation::SimState;
+use crate::circuit::{Circuit, Generator, Input, Pos, Wire, WireKind};
+use crate::simulation::WireSimState;
 
 fn build_circuit() -> Circuit {
+    let cells = BTreeSet::from([Pos::new(0, 0), Pos::new(1, 0), Pos::new(2, 0)]);
+    let wires = vec![
+        Wire::new(Pos::new(1, 0), Pos::new(0, 0), WireKind::Positive),
+        Wire::new(Pos::new(0, 0), Pos::new(2, 0), WireKind::Positive),
+    ];
+    Circuit::new(cells, wires).expect("valid circuit")
+}
+
+#[test]
+fn delayed_wire_slot_is_created_for_backward_wire() {
+    let circuit = build_circuit();
+    let state = WireSimState::from_circuit(&circuit);
+
+    assert_eq!(state.get_delayed_wire(0), Some(false));
+    assert_eq!(state.get_delayed_wire(1), None);
+}
+
+#[test]
+fn stateless_cell_slot_is_created_for_inputless_cell() {
+    let circuit = build_circuit();
+    let state = WireSimState::from_circuit(&circuit);
+
+    // cell index 1 (1,0) は入力なしセル
+    assert_eq!(state.get_stateless_cell(1), Some(false));
+    assert_eq!(state.get_stateless_cell(0), None);
+}
+
+#[test]
+fn input_target_is_excluded_from_stateless_slot() {
     let cells = BTreeSet::from([Pos::new(0, 0), Pos::new(1, 0)]);
-    Circuit::new(cells, Vec::new()).expect("valid circuit")
+    let inputs = vec![Input::Generator(Generator::new(
+        Pos::new(0, 0),
+        vec![true],
+        false,
+    ))];
+    let circuit = Circuit::with_components(cells, Vec::new(), inputs, Vec::new())
+        .expect("valid circuit");
+
+    let state = WireSimState::from_circuit(&circuit);
+    assert_eq!(state.get_stateless_cell(0), None);
+    assert_eq!(state.get_stateless_cell(1), Some(false));
 }
 
 #[test]
-fn state_is_initialized_from_circuit_cells() {
+fn update_methods_change_slot_values() {
     let circuit = build_circuit();
-    let state = SimState::from_circuit(&circuit);
+    let mut state = WireSimState::from_circuit(&circuit);
 
-    assert_eq!(state.get(Pos::new(0, 0)), Some(false));
-    assert_eq!(state.get(Pos::new(1, 0)), Some(false));
-}
+    state.update_wire(0, true);
+    state.update_cell(1, true);
 
-#[test]
-fn set_updates_existing_cell() {
-    let circuit = build_circuit();
-    let mut state = SimState::from_circuit(&circuit);
-
-    state
-        .set(Pos::new(0, 0), true)
-        .expect("existing position must update");
-
-    assert_eq!(state.get(Pos::new(0, 0)), Some(true));
-}
-
-#[test]
-fn set_rejects_unknown_cell() {
-    let circuit = build_circuit();
-    let mut state = SimState::from_circuit(&circuit);
-
-    let err = state
-        .set(Pos::new(9, 9), true)
-        .expect_err("unknown position must fail");
-
-    assert!(matches!(
-        err,
-        crate::base::SimulationError::UnknownCell(Pos { x: 9, y: 9 })
-    ));
+    assert_eq!(state.get_delayed_wire(0), Some(true));
+    assert_eq!(state.get_stateless_cell(1), Some(true));
 }

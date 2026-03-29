@@ -5,7 +5,7 @@ use lgcell2_core::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire
 use lgcell2_core::io::json::{
     CircuitJson, InputJson, OutputJson, parse_expected_pattern, parse_pattern, parse_wire_kind,
 };
-use lgcell2_core::simulation::Simulator;
+use lgcell2_core::simulation::WireSimulator;
 
 #[derive(serde::Deserialize)]
 struct CheckFile {
@@ -99,14 +99,13 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
     )
         .unwrap_or_else(|e| panic!("Failed to build circuit for test case {}: {}", case_name, e));
 
-    // 4. Simulator を作成して初期値を設定
-    let mut sim = Simulator::new(circuit);
+    // 4. WireSimulator を作成して初期値を設定
+    let mut sim = WireSimulator::new(circuit);
 
     for (pos_str, value) in &test_case.initial {
         let pos = parse_pos(pos_str);
 
-        sim.state_mut()
-            .set(pos, *value)
+        sim.set_cell(pos, *value)
             .unwrap_or_else(|e| panic!("Failed to set value at {}: {}", pos_str, e));
     }
 
@@ -125,9 +124,8 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
         let pos = parse_pos(pos_str);
 
         let actual_value = sim
-            .state()
-            .get(pos)
-            .expect(&format!("Failed to get value at {}", pos_str));
+            .get_cell(pos)
+            .unwrap_or_else(|| panic!("Failed to get value at {}", pos_str));
         assert_eq!(
             actual_value, *expected_value,
             "Mismatch at {} in test case {}: expected {}, got {}",

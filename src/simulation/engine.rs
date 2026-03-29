@@ -1,21 +1,16 @@
+use std::collections::HashMap;
+
 use crate::base::SimulationError;
 use crate::circuit::{Circuit, InputComponent, Output, Pos};
-use crate::simulation::state::SimState;
+use crate::simulation::wire_state::WireSimState;
 
-/// `Simulator::step()` の戻り値。
+/// `WireSimulator::step()` の戻り値。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepResult {
     /// 1 セル処理完了。現在の tick にまだ未処理セルがある。
     Continue,
     /// 現在の tick の全セル処理完了。
     TickComplete,
-}
-
-/// 単一 tick 実行後の状態スナップショット。
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct TickSnapshot {
-    pub tick: u64,
-    pub cells: Vec<(Pos, bool)>,
 }
 
 /// テスター検証の不一致結果。
@@ -27,57 +22,134 @@ pub struct TesterResult {
     pub actual: bool,
 }
 
-/// `Simulator::state_mut()` 経由で prev_state と curr_state を同時に更新するためのヘルパー。
-pub struct StateMut<'a> {
-    prev_state: &'a mut SimState,
-    curr_state: &'a mut SimState,
+/// 矩形領域（含む-含む）。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rect {
+    pub min: Pos,
+    pub max: Pos,
 }
 
-impl StateMut<'_> {
-    /// 指定座標の値を prev_state と curr_state の両方で更新する。
-    pub fn set(&mut self, pos: Pos, value: bool) -> Result<(), SimulationError> {
-        self.prev_state.set(pos, value)?;
-        self.curr_state.set(pos, value)?;
-        Ok(())
+impl Rect {
+    pub fn new(min: Pos, max: Pos) -> Self {
+        Self { min, max }
+    }
+
+    pub fn contains(&self, pos: Pos) -> bool {
+        pos.x >= self.min.x
+            && pos.x <= self.max.x
+            && pos.y >= self.min.y
+            && pos.y <= self.max.y
     }
 }
 
-/// 中断可能なシミュレーションエンジン。
+/// tick 完了時の出力形式。
 #[derive(Debug, Clone)]
-pub struct Simulator {
-    circuit: Circuit,
-    /// 前の tick の状態。遅延ワイヤの参照用。
-    prev_state: SimState,
-    /// 現在の tick で計算中の状態。
-    curr_state: SimState,
-    /// 現在の tick 番号 (0-origin)。
-    tick: u64,
-    /// 現在の tick 内で次に処理すべきセルのインデックス。
-    cell_index: usize,
+pub enum OutputFormat {
+    /// すべてのセルの状態を収集する。
+    AllCell,
+    /// 指定された矩形領域内のセルのみ収集する。
+    ViewPort(Vec<Rect>),
 }
 
-impl Simulator {
-    /// 新しいシミュレータを構築する。
+/// 単一 tick 実行後の状態スナップショット。
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TickOutput {
+    pub tick: u64,
+    pub cells: HashMap<Pos, bool>,
+}
+
+/// 遅延ワイヤベースの中断可能シミュレーションエンジン。
+#[derive(Debug, Clone)]
+pub struct WireSimulator {
+    circuit: Circuit,
+    wire_state: WireSimState,
+    cell_values: Vec<bool>,
+    cell_pos_to_index: HashMap<Pos, usize>,
+    tick: u64,
+    cell_index: usize,
+    output_format: OutputFormat,
+}
+
+impl WireSimulator {
+    /// AllCell 形式でシミュレータを構築する。
     pub fn new(circuit: Circuit) -> Self {
-        let state = SimState::from_circuit(&circuit);
+        Self::with_output_format(circuit, OutputFormat::AllCell)
+    }
+
+    /// 出力形式を指定してシミュレータを構築する。
+    pub fn with_output_format(circuit: Circuit, output_format: OutputFormat) -> Self {
+        let cell_count = circuit.sorted_cells().len();
+        let cell_pos_to_index = circuit
+            .sorted_cells()
+            .iter()
+            .enumerate()
+            .map(|(index, &pos)| (pos, index))
+            .collect::<HashMap<_, _>>();
+
         Self {
+            wire_state: WireSimState::from_circuit(&circuit),
             circuit,
-            prev_state: state.clone(),
-            curr_state: state,
+            cell_values: vec![false; cell_count],
+            cell_pos_to_index,
             tick: 0,
             cell_index: 0,
+            output_format,
         }
     }
 
     fn apply_inputs(&mut self) {
         for input in self.circuit.inputs() {
             let value = input.value_at(self.tick);
-            self.prev_state
-                .set(input.target(), value)
-                .expect("input target must exist in previous state");
-            self.curr_state
-                .set(input.target(), value)
-                .expect("input target must exist in current state");
+            let target = input.target();
+            if let Some(&index) = self.cell_pos_to_index.get(&target) {
+                self.cell_values[index] = value;
+            }
+        }
+    }
+
+    fn complete_tick(&mut self) {
+        for (wire_index, wire) in self.circuit.wires().iter().enumerate() {
+            if wire.dst < wire.src {
+                let src_idx = self.cell_pos_to_index[&wire.src];
+                self.wire_state
+                    .update_wire(wire_index, self.cell_values[src_idx]);
+            }
+        }
+
+        for (cell_idx, &pos) in self.circuit.sorted_cells().iter().enumerate() {
+            if self.circuit.incoming_indices(pos).is_empty()
+                && !self.circuit.inputs().iter().any(|input| input.target() == pos)
+            {
+                self.wire_state.update_cell(cell_idx, self.cell_values[cell_idx]);
+            }
+        }
+
+        self.cell_index = 0;
+        self.tick += 1;
+    }
+
+    fn build_output(&self) -> TickOutput {
+        let cells = match &self.output_format {
+            OutputFormat::AllCell => self
+                .circuit
+                .sorted_cells()
+                .iter()
+                .enumerate()
+                .map(|(index, &pos)| (pos, self.cell_values[index]))
+                .collect(),
+            OutputFormat::ViewPort(rects) => self
+                .circuit
+                .sorted_cells()
+                .iter()
+                .enumerate()
+                .filter(|(_, pos)| rects.iter().any(|rect| rect.contains(**pos)))
+                .map(|(index, &pos)| (pos, self.cell_values[index]))
+                .collect(),
+        };
+
+        TickOutput {
+            tick: self.tick,
+            cells,
         }
     }
 
@@ -87,29 +159,25 @@ impl Simulator {
             self.apply_inputs();
         }
 
-        let cell = self.circuit.sorted_cells()[self.cell_index];
+        let cell_idx = self.cell_index;
+        let cell = self.circuit.sorted_cells()[cell_idx];
         let incoming = self.circuit.incoming_indices(cell);
 
         if incoming.is_empty() {
-            let retained = self
-                .prev_state
-                .get(cell)
-                .expect("cell must exist in simulation state");
-            self.curr_state
-                .set(cell, retained)
-                .expect("state update must succeed");
+            if let Some(value) = self.wire_state.get_stateless_cell(cell_idx) {
+                self.cell_values[cell_idx] = value;
+            }
         } else {
             let mut next_value = false;
-            for wire_index in incoming {
-                let wire = &self.circuit.wires()[*wire_index];
+            for &wire_index in incoming {
+                let wire = &self.circuit.wires()[wire_index];
                 let src_value = if wire.dst < wire.src {
-                    self.prev_state
-                        .get(wire.src)
-                        .expect("src must exist in previous state")
+                    self.wire_state
+                        .get_delayed_wire(wire_index)
+                        .expect("delayed wire must have slot")
                 } else {
-                    self.curr_state
-                        .get(wire.src)
-                        .expect("src must exist in current state")
+                    let src_idx = self.cell_pos_to_index[&wire.src];
+                    self.cell_values[src_idx]
                 };
 
                 next_value = next_value || wire.propagate(src_value);
@@ -117,17 +185,12 @@ impl Simulator {
                     break;
                 }
             }
-
-            self.curr_state
-                .set(cell, next_value)
-                .expect("state update must succeed");
+            self.cell_values[cell_idx] = next_value;
         }
 
         self.cell_index += 1;
         if self.cell_index >= self.circuit.sorted_cells().len() {
-            self.prev_state = self.curr_state.clone();
-            self.cell_index = 0;
-            self.tick += 1;
+            self.complete_tick();
             StepResult::TickComplete
         } else {
             StepResult::Continue
@@ -135,38 +198,23 @@ impl Simulator {
     }
 
     /// 1 tick 完了まで進める。
-    pub fn tick(&mut self) -> &SimState {
+    pub fn tick(&mut self) {
         while self.step() != StepResult::TickComplete {}
-        &self.prev_state
     }
 
     /// 指定 tick 数だけ進める。
-    pub fn run(&mut self, ticks: u64) -> &SimState {
+    pub fn run(&mut self, ticks: u64) {
         for _ in 0..ticks {
             self.tick();
         }
-        &self.prev_state
     }
 
-    /// 指定 tick 数だけ進め、各 tick の状態をセル順で収集して返す。
-    pub fn run_with_snapshots(&mut self, ticks: u64) -> Vec<TickSnapshot> {
+    /// 指定 tick 数だけ進め、各 tick の状態を収集して返す。
+    pub fn run_with_snapshots(&mut self, ticks: u64) -> Vec<TickOutput> {
         let mut snapshots = Vec::with_capacity(ticks as usize);
         for _ in 0..ticks {
             self.tick();
-
-            let mut cells = Vec::with_capacity(self.circuit.sorted_cells().len());
-            for pos in self.circuit.sorted_cells() {
-                let value = self
-                    .prev_state
-                    .get(*pos)
-                    .expect("position from sorted cells must exist");
-                cells.push((*pos, value));
-            }
-
-            snapshots.push(TickSnapshot {
-                tick: self.tick,
-                cells,
-            });
+            snapshots.push(self.build_output());
         }
         snapshots
     }
@@ -183,10 +231,8 @@ impl Simulator {
             match output {
                 Output::Tester(tester) => {
                     if let Some(expected) = tester.expected_at(observed_tick) {
-                        let actual = self
-                            .prev_state
-                            .get(tester.target())
-                            .expect("tester target must exist in simulation state");
+                        let index = self.cell_pos_to_index[&tester.target()];
+                        let actual = self.cell_values[index];
                         if actual != expected {
                             mismatches.push(TesterResult {
                                 target: tester.target(),
@@ -218,18 +264,40 @@ impl Simulator {
         &self.circuit
     }
 
-    /// 現在の状態を取得する。
-    pub fn state(&self) -> &SimState {
-        &self.prev_state
+    /// 指定セルの現在値を取得する。
+    pub fn get_cell(&self, pos: Pos) -> Option<bool> {
+        self.cell_pos_to_index
+            .get(&pos)
+            .map(|&index| self.cell_values[index])
     }
 
-    /// 現在の状態を可変参照で取得する。tick 実行前に入力セルの値を設定するために使用する。
-    /// prev_state と curr_state の両方を更新する。
-    pub fn state_mut(&mut self) -> StateMut<'_> {
-        StateMut {
-            prev_state: &mut self.prev_state,
-            curr_state: &mut self.curr_state,
+    /// 指定セルの値を更新する。
+    pub fn set_cell(&mut self, pos: Pos, value: bool) -> Result<(), SimulationError> {
+        let index = self
+            .cell_pos_to_index
+            .get(&pos)
+            .copied()
+            .ok_or(SimulationError::UnknownCell(pos))?;
+        self.cell_values[index] = value;
+        self.wire_state.update_cell(index, value);
+
+        for (wire_index, wire) in self.circuit.wires().iter().enumerate() {
+            if wire.src == pos && wire.dst < wire.src {
+                self.wire_state.update_wire(wire_index, value);
+            }
         }
+
+        Ok(())
+    }
+
+    /// 現在の全セル値を返す。
+    pub fn cell_values(&self) -> HashMap<Pos, bool> {
+        self.circuit
+            .sorted_cells()
+            .iter()
+            .enumerate()
+            .map(|(index, &pos)| (pos, self.cell_values[index]))
+            .collect()
     }
 
     /// 現在の tick 番号を取得する。
@@ -240,6 +308,11 @@ impl Simulator {
     /// 現在 tick 内で処理対象のセルを返す。
     pub fn current_cell(&self) -> Option<Pos> {
         self.circuit.sorted_cells().get(self.cell_index).copied()
+    }
+
+    /// 出力形式を変更する。次の tick 完了から反映される。
+    pub fn set_output_format(&mut self, output_format: OutputFormat) {
+        self.output_format = output_format;
     }
 }
 

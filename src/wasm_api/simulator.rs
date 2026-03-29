@@ -5,34 +5,34 @@ use wasm_bindgen::prelude::*;
 use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 use crate::io::json::{parse_circuit_json, parse_pattern};
 use crate::base::SimulationError;
-use crate::simulation::{Simulator, StepResult};
+use crate::simulation::{StepResult, WireSimulator};
 
 use super::types::{WasmCellState, WasmCircuitInput, WasmTickResult, WasmWireKind, WasmStepRunResult};
 
 /// JavaScript から利用可能なステートフルシミュレータ。
-/// 内部に `Simulator` を保持するオパーク型。
+/// 内部に `WireSimulator` を保持するオパーク型。
 #[wasm_bindgen]
 pub struct WasmSimulator {
-    simulator: Simulator,
+    simulator: WireSimulator,
 }
 
 #[wasm_bindgen]
 impl WasmSimulator {
-    /// 型付き回路データから Simulator を構築する。
+    /// 型付き回路データから WireSimulator を構築する。
     #[wasm_bindgen(constructor)]
     pub fn new(input: WasmCircuitInput) -> Result<WasmSimulator, JsError> {
         let circuit = build_circuit_from_input(input).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(WasmSimulator {
-            simulator: Simulator::new(circuit),
+            simulator: WireSimulator::new(circuit),
         })
     }
 
-    /// JSON 文字列から Simulator を構築する（後方互換）。
+    /// JSON 文字列から WireSimulator を構築する（後方互換）。
     #[wasm_bindgen(js_name = "fromJson")]
     pub fn from_json(circuit_json: &str) -> Result<WasmSimulator, JsError> {
         let circuit = parse_circuit_json(circuit_json).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(WasmSimulator {
-            simulator: Simulator::new(circuit),
+            simulator: WireSimulator::new(circuit),
         })
     }
 
@@ -82,7 +82,7 @@ impl WasmSimulator {
     #[wasm_bindgen(js_name = "getCell")]
     pub fn get_cell(&self, x: i32, y: i32) -> Option<bool> {
         let pos = Pos::new(x, y);
-        self.simulator.state().get(pos)
+        self.simulator.get_cell(pos)
     }
 
     /// 指定セルの値を設定する（入力注入用）。
@@ -90,15 +90,14 @@ impl WasmSimulator {
     pub fn set_cell(&mut self, x: i32, y: i32, value: bool) -> Result<(), JsError> {
         let pos = Pos::new(x, y);
         self.simulator
-            .state_mut()
-            .set(pos, value)
+            .set_cell(pos, value)
             .map_err(|e: SimulationError| JsError::new(&e.to_string()))
     }
 
     // ---- 内部ヘルパー ----
 
     fn build_cell_states(&self) -> Vec<WasmCellState> {
-        let state = self.simulator.state();
+        let state = self.simulator.cell_values();
         self.simulator
             .circuit()
             .sorted_cells()
@@ -106,7 +105,7 @@ impl WasmSimulator {
             .map(|pos| WasmCellState {
                 x: pos.x,
                 y: pos.y,
-                value: state.get(*pos).unwrap_or(false),
+                value: state.get(pos).copied().unwrap_or(false),
             })
             .collect()
     }

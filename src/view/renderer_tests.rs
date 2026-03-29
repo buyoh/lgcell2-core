@@ -1,25 +1,25 @@
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::circuit::{Circuit, Pos};
-use crate::simulation::SimState;
+use crate::simulation::WireSimulator;
 use crate::view::renderer::ViewRenderer;
 
-fn make_state(cells: &[(i32, i32)], on_cells: &[(i32, i32)]) -> SimState {
+fn make_state(cells: &[(i32, i32)], on_cells: &[(i32, i32)]) -> HashMap<Pos, bool> {
     let mut set = BTreeSet::new();
     for (x, y) in cells {
         set.insert(Pos::new(*x, *y));
     }
 
     let circuit = Circuit::new(set, vec![]).expect("circuit must be valid");
-    let mut state = SimState::from_circuit(&circuit);
+    let mut sim = WireSimulator::new(circuit);
 
     for (x, y) in on_cells {
-        state
-            .set(Pos::new(*x, *y), true)
+        sim
+            .set_cell(Pos::new(*x, *y), true)
             .expect("cell should exist in state");
     }
 
-    state
+    sim.cell_values()
 }
 
 #[test]

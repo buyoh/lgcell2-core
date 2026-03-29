@@ -1,7 +1,7 @@
 use crate::io::json::{
     CircuitJson, output_json_to_string, parse_circuit_json, simulate_to_output_json,
 };
-use crate::simulation::Simulator;
+use crate::simulation::WireSimulator;
 
 #[test]
 fn parse_valid_json_to_circuit() {
@@ -14,11 +14,11 @@ fn parse_valid_json_to_circuit() {
     "#;
 
     let circuit = parse_circuit_json(input).expect("json must parse");
-    let mut sim = Simulator::new(circuit);
+    let mut sim = WireSimulator::new(circuit);
     sim.tick();
 
     // src=0,0 は初期値 false → Negative で反転 → true
-    assert_eq!(sim.state().get(crate::circuit::Pos::new(1, 0)), Some(true));
+    assert_eq!(sim.get_cell(crate::circuit::Pos::new(1, 0)), Some(true));
 }
 
 #[test]

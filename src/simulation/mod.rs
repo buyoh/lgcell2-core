@@ -1,5 +1,7 @@
 pub mod engine;
-pub mod state;
+pub mod wire_state;
 
-pub use engine::{Simulator, StateMut, StepResult, TesterResult, TickSnapshot};
-pub use state::SimState;
+pub use engine::{
+	OutputFormat, Rect, StepResult, TesterResult, TickOutput, WireSimulator,
+};
+pub use wire_state::WireSimState;

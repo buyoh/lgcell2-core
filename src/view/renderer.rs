@@ -1,5 +1,6 @@
+use std::collections::HashMap;
+
 use crate::circuit::Pos;
-use crate::simulation::SimState;
 
 const HELP_TEXT: &str = "(q:quit space:pause arrows:scroll)";
 
@@ -19,13 +20,13 @@ impl ViewRenderer {
     }
 
     /// cols x rows のグリッド領域を生成する。
-    pub fn render_grid(&self, state: &SimState, cols: u16, rows: u16) -> String {
+    pub fn render_grid(&self, state: &HashMap<Pos, bool>, cols: u16, rows: u16) -> String {
         let mut output = String::with_capacity((cols as usize + 1) * rows as usize);
 
         for row in 0..rows {
             for col in 0..cols {
                 let pos = Pos::new(self.viewport_x + col as i32, self.viewport_y + row as i32);
-                let ch = match state.get(pos) {
+                let ch = match state.get(&pos) {
                     Some(true) => '#',
                     Some(false) => '_',
                     None => '.',
@@ -65,7 +66,7 @@ impl ViewRenderer {
     /// グリッド + ステータスバーを結合したフレーム文字列を生成する。
     pub fn render_frame(
         &self,
-        state: &SimState,
+        state: &HashMap<Pos, bool>,
         tick: u64,
         paused: bool,
         cols: u16,
