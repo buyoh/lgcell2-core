@@ -3,13 +3,14 @@
 タスクの概要: `OutputFormat` 導入後も `cell_values()` / `get_cell()` など全セル前提の API が残存しており、内部で全セル値を保持し続ける必要がある状態を解消する。出力のキャッシュと Tick リプレイ機能を追加し、将来の ViewPort 最適化の基盤を作る。
 
 作成日: 2026-03-29
-ステータス: 実装中
+ステータス: 完了
 
 ## 進捗
 
 - 2026-03-29: phase1 を実装。`Simulator::cell_values()` と `Simulator::get_cell()` を削除し、呼び出し元を `last_output()` ベースに移行した
 - 2026-03-29: phase1 を成立させる前提として `last_output` キャッシュと `replay_tick()` を先行導入した
 - 2026-03-29: `TickOutput.tick` と JSON 出力の tick 番号を completed tick の 0-based インデックスに統一した
+- 2026-03-29: `run_with_snapshots()` を出力キャッシュ clone ベースへ変更し、タスク全体を完了した
 
 ## 背景・動機
 
@@ -155,4 +156,4 @@ assert_eq!(snapshots[0].tick, 0);
 
 ### フェーズ 3: 高速化対応
 
-8. **`run_with_snapshots()` 修正**: キャッシュから clone する方式に変更し、都度の `build_output()` 呼び出しを排除
+8. [x] **`run_with_snapshots()` 修正**: キャッシュから clone する方式に変更し、都度の `build_output()` 呼び出しを排除
