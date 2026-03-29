@@ -179,6 +179,10 @@ fn set_cell(&mut self, pos: Pos, value: bool) -> Result<(), SimulationError> {
 
 `set_cell()` は `cell_values` と `wire_state` の両方を同期的に更新する。これにより、tick 開始前のどのタイミングで呼ばれても一貫した状態が保たれる。
 
+## 出力形式
+
+tick 完了時のセル状態の収集方法として AllCell / ViewPort の 2 形式を提供する。詳細は [output-format.md](output-format.md) を参照。
+
 ## テスト方針
 
 `WireSimulator` はテストマニフェスト（`resources/tests/test-manifest.yaml`）を使い、エンジンテストで検証する。旧 `Simulator` との出力比較（クロステスト）は行わない。

@@ -115,6 +115,15 @@ cell_pos_to_index: HashMap<Pos, usize>  // 構築時に計算
 
 `cell_values[index]` での O(1) アクセスにより、HashMap のオーバーヘッドを排除する。
 
+### 出力形式— AllCell / ViewPort
+
+tick 完了時に保持するセル状態の出力形式を 2 種類提供する:
+
+- **AllCell**: すべてのセルの状態を `Map<Pos, bool>` で保持する。バッチ実行・JSON 出力・テスト向け
+- **ViewPort**: 指定された `Vec<Rect>` の範囲内のセルのみ `Map<Pos, bool>` で保持する。Web UI・ビューモード向け
+
+詳細は [output-format.md](output-format.md) を参照。
+
 ### 旧実装との関係
 
 旧 `Simulator` / `SimState` は削除し、`WireSimulator` / `WireSimState` で完全に置き換える。
@@ -129,6 +138,7 @@ cell_pos_to_index: HashMap<Pos, usize>  // 構築時に計算
 
 1. **`WireSimState` の実装**: 遅延ワイヤベースの状態管理（[wire-sim-state.md](wire-sim-state.md)）
 2. **`WireSimulator` の実装**: ワイヤ状態モデルのシミュレーションエンジン（[wire-simulator.md](wire-simulator.md)）
-3. **利用側の移行**: `WasmSimulator`, `io::json`, CLI を `WireSimulator` へ直接切り替え（[trait-design.md](trait-design.md)）
-4. **旧実装の削除**: `Simulator`, `SimState`, `StateMut` を削除
-5. **テスト**: テストマニフェスト・エンジンテストで `WireSimulator` を検証
+3. **出力形式の実装**: AllCell / ViewPort 形式の対応（[output-format.md](output-format.md)）
+4. **利用側の移行**: `WasmSimulator`, `io::json`, CLI を `WireSimulator` へ直接切り替え（[trait-design.md](trait-design.md)）
+5. **旧実装の削除**: `Simulator`, `SimState`, `StateMut` を削除
+6. **テスト**: テストマニフェスト・エンジンテストで `WireSimulator` を検証
