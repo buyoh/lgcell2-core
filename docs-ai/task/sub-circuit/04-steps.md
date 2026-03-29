@@ -43,10 +43,11 @@
 
 ### 作業内容
 1. `sub_simulators: Vec<Simulator>` フィールド追加
-2. `module_output_cells`, `module_triggers` の事前計算
+2. `module_output_cells: HashSet<usize>`, `module_triggers: HashMap<usize, usize>` の事前計算
 3. `step()` メソッドの修正（トリガーチェック + 出力セルスキップ）
-4. `evaluate_module()` の実装
-5. `Simulator::new()` での子 Simulator 再帰構築
+4. `evaluate_module()` の実装（`set_cell()` で入力注入、`tick()` で実行、`get_cell()` で出力取得）
+5. `Simulator::new()` / `with_output_format()` での子 Simulator 再帰構築
+6. `WireSimState` との相互作用の確認（sub_input セルが入力なしセルスロットとして扱われることの検証）
 
 ## ステップ 5: テスト
 
