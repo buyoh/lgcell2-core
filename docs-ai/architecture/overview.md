@@ -24,7 +24,7 @@ NAND(a, b) = a →(Neg)→ out, b →(Neg)→ out
 ```
 lib.rs
 ├── circuit/    回路データモデル（Pos, Wire, Circuit）
-├── simulation/ シミュレーションエンジン（WireSimState, WireSimulator）
+├── simulation/ シミュレーションエンジン（WireSimState, Simulator）
 ├── io/         JSON 入出力
 ├── view/       TUI レンダラ
 └── wasm_api/   WASM エクスポート

@@ -40,14 +40,14 @@ step(cell):
     cell_values[cell] = max(values)                           // OR 合成
 ```
 
-## WireSimulator の構造
+## Simulator の構造
 
 ### 概要
 
-`WireSimulator` は遅延ワイヤベースの中断可能シミュレーションエンジンである。旧 `Simulator` が `prev_state` / `curr_state` の 2 つの `HashMap<Pos, bool>` を保持し毎 tick クローンしていたのに対し、`WireSimulator` は遅延が必要な値のみを `WireSimState` に保存し、`cell_values` を in-place で更新する。
+`Simulator` は遅延ワイヤベースの中断可能シミュレーションエンジンである。旧 `Simulator` が `prev_state` / `curr_state` の 2 つの `HashMap<Pos, bool>` を保持し毎 tick クローンしていたのに対し、`Simulator` は遅延が必要な値のみを `WireSimState` に保存し、`cell_values` を in-place で更新する。
 
 ```rust
-pub struct WireSimulator {
+pub struct Simulator {
     circuit: Circuit,
     wire_state: WireSimState,          // 遅延ワイヤ・入力なしセルの前 tick 値
     cell_values: Vec<bool>,            // 全セルの現在値（sorted_cells と同順）

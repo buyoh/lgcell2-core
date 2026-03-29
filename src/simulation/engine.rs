@@ -4,7 +4,7 @@ use crate::base::SimulationError;
 use crate::circuit::{Circuit, InputComponent, Output, Pos};
 use crate::simulation::wire_state::WireSimState;
 
-/// `WireSimulator::step()` の戻り値。
+/// `Simulator::step()` の戻り値。
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StepResult {
     /// 1 セル処理完了。現在の tick にまだ未処理セルがある。
@@ -60,7 +60,7 @@ pub struct TickOutput {
 
 /// 遅延ワイヤベースの中断可能シミュレーションエンジン。
 #[derive(Debug, Clone)]
-pub struct WireSimulator {
+pub struct Simulator {
     circuit: Circuit,
     wire_state: WireSimState,
     cell_values: Vec<bool>,
@@ -70,7 +70,7 @@ pub struct WireSimulator {
     output_format: OutputFormat,
 }
 
-impl WireSimulator {
+impl Simulator {
     /// AllCell 形式でシミュレータを構築する。
     pub fn new(circuit: Circuit) -> Self {
         Self::with_output_format(circuit, OutputFormat::AllCell)

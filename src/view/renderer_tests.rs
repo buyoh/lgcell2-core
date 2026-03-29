@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashMap};
 
 use crate::circuit::{Circuit, Pos};
-use crate::simulation::WireSimulator;
+use crate::simulation::Simulator;
 use crate::view::renderer::ViewRenderer;
 
 fn make_state(cells: &[(i32, i32)], on_cells: &[(i32, i32)]) -> HashMap<Pos, bool> {
@@ -11,7 +11,7 @@ fn make_state(cells: &[(i32, i32)], on_cells: &[(i32, i32)]) -> HashMap<Pos, boo
     }
 
     let circuit = Circuit::new(set, vec![]).expect("circuit must be valid");
-    let mut sim = WireSimulator::new(circuit);
+    let mut sim = Simulator::new(circuit);
 
     for (x, y) in on_cells {
         sim
