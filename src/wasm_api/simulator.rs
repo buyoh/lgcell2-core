@@ -74,6 +74,14 @@ impl WasmSimulator {
         self.simulator.current_tick() as u32
     }
 
+    /// tick 内の更新処理中かどうかを返す。
+    /// `true` の場合、内部状態は不完全であり `getState()` / `getCell()` は
+    /// 前 tick の値を返す可能性がある。
+    #[wasm_bindgen(js_name = "isUpdating", getter)]
+    pub fn is_updating(&self) -> bool {
+        self.simulator.is_updating()
+    }
+
     /// 全セルの状態を返す。
     #[wasm_bindgen(js_name = "getState")]
     pub fn get_state(&self) -> Vec<WasmCellState> {

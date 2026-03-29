@@ -326,3 +326,36 @@ fn run_with_verification_collects_all_tick_mismatches() {
     assert_eq!(mismatches.len(), 1);
     assert_eq!(mismatches[0].tick, 0);
 }
+
+#[test]
+fn is_updating_false_after_construction() {
+    let circuit = make_circuit(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(Pos::new(0, 0), Pos::new(1, 0), WireKind::Positive)],
+    );
+    let sim = Simulator::new(circuit);
+    assert!(!sim.is_updating());
+}
+
+#[test]
+fn is_updating_true_during_tick() {
+    let circuit = make_circuit(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(Pos::new(0, 0), Pos::new(1, 0), WireKind::Positive)],
+    );
+    let mut sim = Simulator::new(circuit);
+    let result = sim.step();
+    assert_eq!(result, StepResult::Continue);
+    assert!(sim.is_updating());
+}
+
+#[test]
+fn is_updating_false_after_tick_complete() {
+    let circuit = make_circuit(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(Pos::new(0, 0), Pos::new(1, 0), WireKind::Positive)],
+    );
+    let mut sim = Simulator::new(circuit);
+    sim.tick();
+    assert!(!sim.is_updating());
+}

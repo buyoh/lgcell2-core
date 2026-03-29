@@ -39,25 +39,50 @@ pub struct TickOutput {
 }
 
 /// 遅延ワイヤベースの中断可能シミュレーションエンジン。
+///
+/// tick 内の途中状態（`cell_index > 0`）を「更新中」と呼ぶ。
+/// 更新中は一部のフィールドが不完全な値を持つため、
+/// 状態の読み取りには注意が必要。
 #[derive(Debug, Clone)]
 pub struct Simulator {
+    /// 回路定義。不変。更新中でも常に有効。
     circuit: Circuit,
+    /// 遅延ワイヤおよび入力なしセルの前 tick 値。
+    /// 更新中: 前 tick の値を保持（現 tick の step() で読み取られる）。
+    /// complete_tick() で現 tick の値に更新される。
     wire_state: WireSimState,
+    /// 全セルの現在値。sorted_cells() と同じ順序でインデックスされる。
+    /// 更新中: インデックス `< cell_index` のセルは現 tick の計算済み値、
+    ///         `>= cell_index` のセルは前 tick の値のまま。
+    /// complete_tick() 完了後は全セルが現 tick の値を持つ。
     cell_values: Vec<bool>,
+    /// Pos → cell_values インデックスの逆引きマップ。不変。更新中でも常に有効。
     cell_pos_to_index: HashMap<Pos, usize>,
+    /// 完了した tick 数（0-based の次 tick 番号）。
+    /// 更新中: 現在処理中の tick の番号を保持。complete_tick() でインクリメントされる。
     tick: u64,
+    /// 現在 tick 内で次に処理するセルのインデックス。
+    /// 0 = tick 間の待機状態（更新完了）。
+    /// 1 以上 = tick 内の更新中。
+    /// complete_tick() で 0 にリセットされる。
     cell_index: usize,
+    /// 直近の完了 tick の出力キャッシュ。
+    /// 更新中: 前回の complete_tick() 時点の出力を保持しており、現 tick の途中経過は反映されない。
+    /// complete_tick() で現 tick の最終値から再構築される。
     last_output: TickOutput,
+    /// 出力形式の設定。不変（set_output_format で変更可能）。更新中でも常に有効。
     output_format: OutputFormat,
 }
 
 impl Simulator {
     /// AllCell 形式でシミュレータを構築する。
+    /// 構築直後は更新完了状態（`is_updating() == false`）。
     pub fn new(circuit: Circuit) -> Self {
         Self::with_output_format(circuit, OutputFormat::AllCell)
     }
 
     /// 出力形式を指定してシミュレータを構築する。
+    /// 構築直後は更新完了状態（`is_updating() == false`）。
     pub fn with_output_format(circuit: Circuit, output_format: OutputFormat) -> Self {
         let cell_count = circuit.sorted_cells().len();
         let cell_pos_to_index = circuit
@@ -163,6 +188,11 @@ impl Simulator {
     }
 
     /// 1 セル分だけ進める。中断ポイント。
+    ///
+    /// 呼び出し後、`TickComplete` が返るまでシミュレータは更新中状態になる。
+    /// 更新中は `cell_values` が部分的に更新されており、`last_output` は前 tick のまま。
+    /// `TickComplete` が返った時点で `complete_tick()` が実行済みとなり、
+    /// 全フィールドが整合した状態に戻る。
     pub fn step(&mut self) -> StepResult {
         if self.cell_index == 0 {
             self.apply_inputs();
@@ -207,11 +237,13 @@ impl Simulator {
     }
 
     /// 1 tick 完了まで進める。
+    /// 呼び出し前後で更新完了状態が保証される。
     pub fn tick(&mut self) {
         while self.step() != StepResult::TickComplete {}
     }
 
     /// 指定 tick 数だけ進める。
+    /// 呼び出し前後で更新完了状態が保証される。
     pub fn run(&mut self, ticks: u64) {
         for _ in 0..ticks {
             self.tick();
@@ -219,6 +251,7 @@ impl Simulator {
     }
 
     /// 指定 tick 数だけ進め、各 tick の状態を収集して返す。
+    /// 呼び出し前後で更新完了状態が保証される。
     pub fn run_with_snapshots(&mut self, ticks: u64) -> Vec<TickOutput> {
         let mut snapshots = Vec::with_capacity(ticks as usize);
         for _ in 0..ticks {
@@ -229,6 +262,9 @@ impl Simulator {
     }
 
     /// 直近で完了した tick のテスター検証を行い、不一致を返す。
+    ///
+    /// 更新中に呼び出した場合、`cell_values` が不完全なため正しい結果が得られない。
+    /// 更新完了状態（`is_updating() == false`）で呼び出すこと。
     pub fn verify_testers(&self) -> Vec<TesterResult> {
         if self.tick == 0 {
             return Vec::new();
@@ -259,6 +295,7 @@ impl Simulator {
     }
 
     /// 指定 tick 数だけ進め、各 tick のテスター検証結果を収集して返す。
+    /// 呼び出し前後で更新完了状態が保証される。
     pub fn run_with_verification(&mut self, ticks: u64) -> Vec<TesterResult> {
         let mut mismatches = Vec::new();
         for _ in 0..ticks {
@@ -268,12 +305,16 @@ impl Simulator {
         mismatches
     }
 
-    /// 回路定義を取得する。
+    /// 回路定義を取得する。不変であるため更新中でも安全。
     pub fn circuit(&self) -> &Circuit {
         &self.circuit
     }
 
     /// 指定セルの値を更新する。
+    ///
+    /// `cell_values`、`wire_state`、`last_output` を即時更新する。
+    /// 更新中に呼び出した場合、注入した値がその後の step() で上書きされる可能性がある。
+    /// 更新完了状態で呼び出すことを推奨。
     pub fn set_cell(&mut self, pos: Pos, value: bool) -> Result<(), SimulationError> {
         let index = self
             .cell_pos_to_index
@@ -297,28 +338,50 @@ impl Simulator {
     }
 
     /// 現在の出力キャッシュを返す。
+    ///
+    /// 更新中は前回 complete_tick() 時点の値を返す（現 tick の途中経過は反映されない）。
+    /// 更新完了状態では直近の tick 完了時の値を返す。
     pub fn last_output(&self) -> &TickOutput {
         &self.last_output
     }
 
     /// 現在の状態から出力キャッシュを再構築する。
+    ///
+    /// 更新中に呼び出した場合、不完全な `cell_values` から出力が構築されるため、
+    /// 一部のセルが前 tick の値のままになる。
     pub fn replay_tick(&mut self) {
         self.last_output = self.build_output();
     }
 
-    /// 現在の tick 番号を取得する。
+    /// 完了した tick 数を返す（次に実行される tick の 0-based 番号でもある）。
+    ///
+    /// 更新中は現在処理中の tick 番号を返す。
+    /// 更新完了状態では、直近に完了した tick + 1 を返す。
     pub fn current_tick(&self) -> u64 {
         self.tick
     }
 
-    /// 現在 tick 内で処理対象のセルを返す。
+    /// 現在 tick 内で次に処理されるセルを返す。
+    ///
+    /// 更新中は次の step() で処理されるセルを返す。
+    /// 更新完了状態では最初のセルを返す（次の tick の先頭）。
     pub fn current_cell(&self) -> Option<Pos> {
         self.circuit.sorted_cells().get(self.cell_index).copied()
     }
 
     /// 出力形式を変更する。即時反映したい場合は `replay_tick()` を呼ぶ。
+    /// 更新中でも安全に呼び出せる。
     pub fn set_output_format(&mut self, output_format: OutputFormat) {
         self.output_format = output_format;
+    }
+
+    /// tick 内の更新処理中かどうかを返す。
+    ///
+    /// `true` の場合、`cell_values` は部分的にしか更新されておらず、
+    /// `last_output` は前 tick の値のまま。
+    /// `false` の場合、全フィールドが整合した状態にある。
+    pub fn is_updating(&self) -> bool {
+        self.cell_index > 0
     }
 }
 
