@@ -24,9 +24,9 @@ src/
 │   └── circuit_tests.rs
 ├── simulation/             # シミュレーションエンジン（circuit に依存）
 │   ├── mod.rs
-│   ├── state.rs            # シミュレーション状態 SimState
+│   ├── wire_state.rs       # 遅延ワイヤ状態 WireSimState
 │   ├── state_tests.rs
-│   ├── engine.rs           # ステップ実行エンジン Simulator
+│   ├── engine.rs           # ステップ実行エンジン WireSimulator
 │   └── engine_tests.rs
 └── io/                     # JSON 入出力（circuit, simulation に依存）
     ├── mod.rs
@@ -40,6 +40,8 @@ src/
 bin/lgcell2/main.rs
     ↓ (全モジュールを統合)
 io::json ──→ circuit, simulation
+view     ──→ circuit (HashMap<Pos,bool> を受け取る)
+wasm_api ──→ circuit, simulation
 simulation ──→ circuit
 circuit ──→ (外部依存なし)
 ```
@@ -59,21 +61,25 @@ circuit ──→ (外部依存なし)
 
 `circuit` モジュールに依存する。
 
-- **`SimState`**: セルごとの `bool` 値を `HashMap<Pos, bool>` で管理。`from_circuit()` で全セル `false` に初期化。
-- **`Simulator`**: 中断・再開可能なステップ実行エンジン。`prev_state`（前 tick）と `curr_state`（現 tick 計算中）の 2 つの状態を保持する。
+- **`WireSimState`**: 遅延ワイヤベースのシミュレーション状態。遅延伝搬ワイヤと入力なしセルの前 tick 値のみを `Vec<bool>` スロットで管理。
+- **`WireSimulator`**: 中断・再開可能なステップ実行エンジン。`wire_state`（遅延値）と `cell_values: Vec<bool>`（全セルの現在値）を保持し、in-place で更新する。
   - `step()`: セル 1 個分を処理し `StepResult` を返す
   - `tick()`: 1 tick 完了まで処理
   - `run(n)`: n tick 実行
-  - `run_with_snapshots(n)`: 各 tick のスナップショットを収集
+  - `run_with_snapshots(n)`: 各 tick の `TickOutput` を収集
+  - `run_with_verification(n)`: 各 tick のテスター検証結果を収集
+  - `get_cell()` / `set_cell()`: セル値の取得・設定
+  - `cell_values()`: 全セル値を `HashMap<Pos, bool>` で返す
 - **`StepResult`**: `Continue`（tick 内に未処理セルあり）/ `TickComplete`（tick 完了）
-- **`TickSnapshot`**: tick 番号と全セル値のスナップショット
+- **`TickOutput`**: tick 番号とセル値の `HashMap<Pos, bool>`。`OutputFormat` に応じて全セルまたは矩形領域内のセルのみを含む
+- **`OutputFormat`**: `AllCell`（全セル）/ `ViewPort(Vec<Rect>)`（矩形領域内のみ）
 
 **シミュレーション伝搬ルール:**
 - セルは `Pos` の辞書順 `(x, y)` で処理される
 - ワイヤ遅延は座標順序で自動決定:
-  - `dst < src`（辞書順） → 遅延伝搬（`prev_state[src]` を使用）
-  - `dst >= src`（辞書順） → 即時伝搬（`curr_state[src]` を使用）
-- セルの値 = 全入力ワイヤの伝搬値の OR（`max()`）。入力なしの場合は前 tick の値を保持
+  - `dst < src`（辞書順） → 遅延伝搬（`wire_state` のスロットから前 tick の値を取得）
+  - `dst >= src`（辞書順） → 即時伝搬（`cell_values[src]` を直接参照）
+- セルの値 = 全入力ワイヤの伝搬値の OR（`max()`）。入力なしの場合は `wire_state` から前 tick の値を取得
 
 ### `io/` — JSON 入出力
 
@@ -91,9 +97,9 @@ circuit ──→ (外部依存なし)
 
 ## 主要な設計パターン
 
-1. **イミュータブル Circuit + ミュータブル Simulator**: `Circuit` は構築後不変でスレッド安全。`Simulator` が変更可能な状態を管理する。
+1. **イミュータブル Circuit + ミュータブル WireSimulator**: `Circuit` は構築後不変でスレッド安全。`WireSimulator` が変更可能な状態を管理する。
 2. **座標順序ベースのシミュレーション**: `Pos` の `Ord` が処理順を決定し、ワイヤ遅延も自動決定される。明示的な遅延宣言は不要。
-3. **事前計算による最適化**: `incoming` マップと `sorted_cells` を構築時に計算し、シミュレーション時の高速ルックアップを実現。
+3. **遅延ワイヤベースの状態管理**: 全セルのダブルバッファではなく、遅延が必要なワイヤと入力なしセルのみ `WireSimState` にスロットを割り当て、`cell_values` を in-place で更新する。
 4. **ステップ実行エンジン**: `cell_index` で処理位置を保持する明示的なステートマシン。async/await を使わずに Web 上での中断・再開に対応。
 5. **JSON スキーマの分離**: `CircuitJson` ↔ `Circuit` を `TryFrom` で変換し、スキーマと内部実装を隔離。
 
