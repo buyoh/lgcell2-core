@@ -17,3 +17,7 @@ impl std::fmt::Display for Pos {
         write!(f, "({}, {})", self.x, self.y)
     }
 }
+
+#[cfg(test)]
+#[path = "pos_tests.rs"]
+mod pos_tests;
