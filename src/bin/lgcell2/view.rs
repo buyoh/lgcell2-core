@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use lgcell2_core::circuit::Circuit;
 use lgcell2_core::platform::console::{Console, CrosstermConsole, KeyInput};
-use lgcell2_core::simulation::Simulator;
+use lgcell2_core::simulation::{Simulator, SimulatorSimple};
 use lgcell2_core::view::ViewRenderer;
 
 const TICK_INTERVAL: Duration = Duration::from_millis(200);
@@ -27,7 +27,7 @@ fn run_view_loop_with_config<C: Console>(
 
     let run_result = (|| {
         let (x, y) = initial_viewport(&circuit);
-        let mut simulator = Simulator::new(circuit);
+        let mut simulator = SimulatorSimple::new(circuit);
         let mut renderer = ViewRenderer::new(x, y);
         let mut paused = false;
         let mut tick_started_at = Instant::now();
@@ -87,7 +87,7 @@ fn run_view_loop_with_config<C: Console>(
 fn render_once<C: Console>(
     console: &mut C,
     renderer: &ViewRenderer,
-    simulator: &Simulator,
+    simulator: &SimulatorSimple,
     paused: bool,
 ) -> Result<(), String> {
     let output = simulator.last_output();

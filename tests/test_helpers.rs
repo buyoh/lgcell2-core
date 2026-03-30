@@ -5,7 +5,7 @@ use lgcell2_core::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire
 use lgcell2_core::io::json::{
     CircuitJson, InputJson, OutputJson, parse_expected_pattern, parse_pattern, parse_wire_kind,
 };
-use lgcell2_core::simulation::Simulator;
+use lgcell2_core::simulation::{Simulator, SimulatorSimple};
 
 #[derive(serde::Deserialize)]
 struct CheckFile {
@@ -100,7 +100,7 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
     .unwrap_or_else(|e| panic!("Failed to build circuit for test case {}: {}", case_name, e));
 
     // 4. Simulator を作成して初期値を設定
-    let mut sim = Simulator::new(circuit);
+    let mut sim = SimulatorSimple::new(circuit);
 
     for (pos_str, value) in &test_case.initial {
         let pos = parse_pos(pos_str);

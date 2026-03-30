@@ -5,36 +5,36 @@ use wasm_bindgen::prelude::*;
 use crate::base::SimulationError;
 use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
 use crate::io::json::{parse_circuit_json, parse_pattern};
-use crate::simulation::{Simulator, StepResult};
+use crate::simulation::{SimulatorSimple, Simulator, StepResult};
 
 use super::types::{
     WasmCellState, WasmCircuitInput, WasmStepRunResult, WasmTickResult, WasmWireKind,
 };
 
 /// JavaScript から利用可能なステートフルシミュレータ。
-/// 内部に `Simulator` を保持するオパーク型。
+/// 内部に `SimulatorSimple` を保持するオパーク型。
 #[wasm_bindgen]
 pub struct WasmSimulator {
-    simulator: Simulator,
+    simulator: SimulatorSimple,
 }
 
 #[wasm_bindgen]
 impl WasmSimulator {
-    /// 型付き回路データから Simulator を構築する。
+    /// 型付き回路データから SimulatorSimple を構築する。
     #[wasm_bindgen(constructor)]
     pub fn new(input: WasmCircuitInput) -> Result<WasmSimulator, JsError> {
         let circuit = build_circuit_from_input(input).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(WasmSimulator {
-            simulator: Simulator::new(circuit),
+            simulator: SimulatorSimple::new(circuit),
         })
     }
 
-    /// JSON 文字列から Simulator を構築する（後方互換）。
+    /// JSON 文字列から SimulatorSimple を構築する（後方互換）。
     #[wasm_bindgen(js_name = "fromJson")]
     pub fn from_json(circuit_json: &str) -> Result<WasmSimulator, JsError> {
         let circuit = parse_circuit_json(circuit_json).map_err(|e| JsError::new(&e.to_string()))?;
         Ok(WasmSimulator {
-            simulator: Simulator::new(circuit),
+            simulator: SimulatorSimple::new(circuit),
         })
     }
 

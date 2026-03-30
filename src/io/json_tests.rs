@@ -1,9 +1,9 @@
 use crate::io::json::{
     CircuitJson, output_json_to_string, parse_circuit_json, simulate_to_output_json,
 };
-use crate::simulation::Simulator;
+use crate::simulation::{Simulator, SimulatorSimple};
 
-fn output_cell(sim: &Simulator, pos: crate::circuit::Pos) -> Option<bool> {
+fn output_cell(sim: &SimulatorSimple, pos: crate::circuit::Pos) -> Option<bool> {
     sim.last_output().cells.get(&pos).copied()
 }
 
@@ -18,7 +18,7 @@ fn parse_valid_json_to_circuit() {
     "#;
 
     let circuit = parse_circuit_json(input).expect("json must parse");
-    let mut sim = Simulator::new(circuit);
+    let mut sim = SimulatorSimple::new(circuit);
     sim.tick();
 
     // src=0,0 は初期値 false → Negative で反転 → true
