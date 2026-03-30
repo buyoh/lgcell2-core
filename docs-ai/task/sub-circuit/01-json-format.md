@@ -12,7 +12,7 @@
 | `input` | `Input[]` | いいえ | Input コンポーネントの配列（既存） |
 | `output` | `Output[]` | いいえ | Output コンポーネントの配列（既存） |
 | **`modules`** | `Module[]` | いいえ | モジュールインスタンスの配列（**新規**） |
-| **`sub_circuits`** | `{ name: SubCircuit }` | いいえ | サブ回路定義のマップ（**新規**） |
+| **`subs`** | `{ name: SubCircuit }` | いいえ | サブ回路定義のマップ（**新規**） |
 
 ## Module オブジェクト
 
@@ -42,11 +42,11 @@
 
 ## サブ回路定義のスコープ
 
-初期バージョンでは、全てのサブ回路定義はルートレベルの `sub_circuits` に配置する。サブ回路内の `modules` はルートレベルの定義のみ参照できる。
+初期バージョンでは、全てのサブ回路定義はルートレベルの `subs` に配置する。サブ回路内の `modules` はルートレベルの定義のみ参照できる。
 
 ```
 ルート
-├── sub_circuits
+├── subs
 │   ├── half_adder    ← 定義
 │   └── full_adder    ← 定義（modules 内で half_adder を参照可能）
 └── modules
@@ -71,7 +71,7 @@
       "output": [ [2, 0], [2, 1] ]
     }
   ],
-  "sub_circuits": {
+  "subs": {
     "half_adder": {
       "wires": [
         { "src": [0, 0], "dst": [1, 0], "kind": "positive" },
@@ -107,7 +107,7 @@
       "output": [ [5, 0], [5, 1] ]
     }
   ],
-  "sub_circuits": {
+  "subs": {
     "half_adder": {
       "wires": [
         { "src": [0, 0], "dst": [1, 0], "kind": "positive" },
@@ -177,7 +177,7 @@
 5. `modules[i].output` の要素数は、参照するサブ回路の `sub_output` の要素数と一致すること
 6. `modules[i].output` の各座標は、親回路内でワイヤの `dst` になってはならない（入力ワイヤ禁止）
 7. 異なるモジュール間で `output` 座標が重複してはならない
-8. `modules[i].sub_circuit` で指定されたサブ回路定義が `sub_circuits` 内に存在すること
+8. `modules[i].sub_circuit` で指定されたサブ回路定義が `subs` 内に存在すること
 
 ### サブ回路定義
 
