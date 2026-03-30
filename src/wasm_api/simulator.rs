@@ -1,9 +1,7 @@
-use std::collections::BTreeSet;
-
 use wasm_bindgen::prelude::*;
 
 use crate::base::SimulationError;
-use crate::circuit::{Circuit, Generator, Pos, Wire, WireKind};
+use crate::circuit::{Circuit, CircuitBuilder, Generator, Input, Pos, WireKind};
 use crate::io::json::{parse_circuit_json, parse_pattern};
 use crate::simulation::{SimulatorSimple, Simulator, StepResult};
 
@@ -132,8 +130,7 @@ impl WasmSimulator {
 
 /// `WasmCircuitInput` から内部 `Circuit` を構築する。
 fn build_circuit_from_input(input: WasmCircuitInput) -> Result<Circuit, crate::base::ParseError> {
-    let mut cells = BTreeSet::new();
-    let mut wires = Vec::with_capacity(input.wires.len());
+    let mut builder = CircuitBuilder::new();
 
     for wire_input in input.wires {
         let src = Pos::new(wire_input.src[0], wire_input.src[1]);
@@ -142,19 +139,16 @@ fn build_circuit_from_input(input: WasmCircuitInput) -> Result<Circuit, crate::b
             WasmWireKind::Positive => WireKind::Positive,
             WasmWireKind::Negative => WireKind::Negative,
         };
-        cells.insert(src);
-        cells.insert(dst);
-        wires.push(Wire::new(src, dst, kind));
+        builder.add_wire(src, dst, kind);
     }
 
-    let mut generators = Vec::with_capacity(input.generators.len());
     for gen_input in input.generators {
         let target = Pos::new(gen_input.target[0], gen_input.target[1]);
         let pattern = parse_pattern(&gen_input.pattern).map_err(crate::base::ParseError::from)?;
-        generators.push(Generator::new(target, pattern, gen_input.is_loop));
+        builder.add_input(Input::Generator(Generator::new(target, pattern, gen_input.is_loop)));
     }
 
-    Circuit::with_generators(cells, wires, generators).map_err(crate::base::ParseError::from)
+    builder.build().map_err(crate::base::ParseError::from)
 }
 
 #[cfg(test)]

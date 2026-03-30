@@ -3,8 +3,8 @@
 タスクの概要: ソースコード、テストコード、設定ファイルを対象としたコードレビュー指摘事項の修正。
 
 作成日: 2026-03-26
-更新日: 2026-03-30
-ステータス: 設計完了（未実装）
+更新日: 2026-03-31
+ステータス: 完了
 
 ## 背景・動機
 
@@ -22,8 +22,8 @@
 以下の 3 箇所で「`BTreeSet<Pos>` を作成 → ワイヤ列を走査して `Wire` を構築しつつ `cells` に `src`/`dst` を挿入 → `Circuit::with_components()` を呼ぶ」というパターンが重複している。
 
 1. `src/io/json.rs` — `TryFrom<CircuitJson> for Circuit` (L88–L155)
-2. `src/wasm_api/simulator.rs` — `build_circuit_from_input()` (L126–L151)
-3. `tests/test_helpers.rs` — `build_circuit_with_case_inputs()` (L149–L260)
+2. `src/wasm_api/simulator.rs` — `build_circuit_from_input()` (L134–L162)
+3. `tests/test_helpers.rs` — `build_circuit_with_case_inputs()` (L140–L259)
 
 **方針**: 案 A — `CircuitBuilder` を `circuit` モジュールに導入
 
@@ -63,7 +63,7 @@ impl CircuitBuilder {
 レビュー時点で 8 箇所あった `expect()` は、別タスク（ワイヤ状態モデルのリファクタリング）で大半が削除された。
 残り 1 箇所のみ:
 
-- `src/simulation/engine.rs` L186: `.expect("delayed wire must have slot")`
+- `src/simulation/engine.rs` L281: `.expect("delayed wire must have slot")`
 
 これは `Circuit` 構築時の不変条件（遅延ワイヤには必ずスロットが存在する）に依存しており、入力バリデーションの問題ではなく実装上の不変条件であるため、`debug_assert!` + `unwrap_or` に置き換える。
 

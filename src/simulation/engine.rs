@@ -276,9 +276,11 @@ impl Simulator for SimulatorSimple {
             for &wire_index in incoming {
                 let wire = &self.circuit.wires()[wire_index];
                 let src_value = if wire.dst < wire.src {
-                    self.wire_state
-                        .get_delayed_wire(wire_index)
-                        .expect("delayed wire must have slot")
+                    // 遅延ワイヤには Circuit 構築時に必ずスロットが割り当てられる不変条件に依存している。
+                    // リリースビルドでは unwrap_or(false) でフォールバックし、デバッグビルドで検出する。
+                    let delayed_value = self.wire_state.get_delayed_wire(wire_index);
+                    debug_assert!(delayed_value.is_some(), "delayed wire must have slot");
+                    delayed_value.unwrap_or(false)
                 } else {
                     let src_idx = self.cell_pos_to_index[&wire.src];
                     self.cell_values[src_idx]

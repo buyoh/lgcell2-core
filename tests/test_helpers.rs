@@ -1,7 +1,7 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use lgcell2_core::base::ParseError;
-use lgcell2_core::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire};
+use lgcell2_core::circuit::{Circuit, CircuitBuilder, Generator, Input, Output, Pos, Tester};
 use lgcell2_core::io::json::{
     CircuitJson, InputJson, OutputJson, parse_expected_pattern, parse_pattern, parse_wire_kind,
 };
@@ -143,17 +143,13 @@ fn build_circuit_with_case_inputs(
     case_outputs: &[OutputCaseJson],
     case_generators: &[GeneratorJson],
 ) -> Result<Circuit, ParseError> {
-    let mut cells = BTreeSet::new();
-    let mut wires = Vec::with_capacity(circuit_json.wires.len());
+    let mut builder = CircuitBuilder::new();
 
     for wire in &circuit_json.wires {
         let src = Pos::new(wire.src[0], wire.src[1]);
         let dst = Pos::new(wire.dst[0], wire.dst[1]);
         let kind = parse_wire_kind(&wire.kind)?;
-
-        cells.insert(src);
-        cells.insert(dst);
-        wires.push(Wire::new(src, dst, kind));
+        builder.add_wire(src, dst, kind);
     }
 
     let mut inputs_by_target: BTreeMap<Pos, Input> = BTreeMap::new();
@@ -256,7 +252,15 @@ fn build_circuit_with_case_inputs(
 
     let inputs = inputs_by_target.into_values().collect::<Vec<_>>();
     let outputs = outputs_by_target.into_values().collect::<Vec<_>>();
-    Circuit::with_components(cells, wires, inputs, outputs).map_err(ParseError::from)
+
+    for input in inputs {
+        builder.add_input(input);
+    }
+    for output in outputs {
+        builder.add_output(output);
+    }
+
+    builder.build().map_err(ParseError::from)
 }
 
 fn parse_pos(pos_str: &str) -> Pos {

@@ -35,9 +35,9 @@ fn generate_tests() {
     let manifest: TestManifest =
         serde_yaml::from_str(&manifest_content).expect("Failed to parse test-manifest.yaml");
 
-    let out_dir = env::var("OUT_DIR").unwrap();
+    let out_dir = env::var("OUT_DIR").expect("OUT_DIR not set");
     let dest_path = Path::new(&out_dir).join("generated_tests.rs");
-    let mut f = fs::File::create(&dest_path).unwrap();
+    let mut f = fs::File::create(&dest_path).expect("Failed to create generated_tests.rs");
 
     for test in manifest.tests {
         match test.test_type.as_str() {
@@ -85,7 +85,7 @@ fn test_{}_{}_() {{
 "#,
             comment_line, test.name, case.name, test.path, case.name
         )
-        .unwrap();
+        .expect("Failed to write test function");
     }
 }
 
@@ -105,5 +105,5 @@ fn test_{}_() {{
 "#,
         comment_line, test.name, test.path
     )
-    .unwrap();
+    .expect("Failed to write test function");
 }

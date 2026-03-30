@@ -1,9 +1,9 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
 use crate::base::{FormatError, ParseError};
-use crate::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire, WireKind};
+use crate::circuit::{Circuit, CircuitBuilder, Generator, Input, Output, Pos, Tester, WireKind};
 use crate::simulation::{Simulator, SimulatorSimple};
 
 /// 回路 JSON 全体を表す入力モデル。
@@ -89,20 +89,15 @@ impl TryFrom<CircuitJson> for Circuit {
     type Error = ParseError;
 
     fn try_from(value: CircuitJson) -> Result<Self, Self::Error> {
-        let mut cells = BTreeSet::new();
-        let mut wires = Vec::with_capacity(value.wires.len());
+        let mut builder = CircuitBuilder::new();
 
         for wire in value.wires {
             let src = Pos::new(wire.src[0], wire.src[1]);
             let dst = Pos::new(wire.dst[0], wire.dst[1]);
             let kind = parse_wire_kind(&wire.kind)?;
-
-            cells.insert(src);
-            cells.insert(dst);
-            wires.push(Wire::new(src, dst, kind));
+            builder.add_wire(src, dst, kind);
         }
 
-        let mut inputs = Vec::with_capacity(value.input.len() + value.generators.len());
         for input in value.input {
             match input {
                 InputJson::Generator {
@@ -112,7 +107,7 @@ impl TryFrom<CircuitJson> for Circuit {
                 } => {
                     let target = Pos::new(target[0], target[1]);
                     let pattern = parse_pattern(&pattern)?;
-                    inputs.push(Input::Generator(Generator::new(target, pattern, is_loop)));
+                    builder.add_input(Input::Generator(Generator::new(target, pattern, is_loop)));
                 }
             }
         }
@@ -120,14 +115,13 @@ impl TryFrom<CircuitJson> for Circuit {
         for generator in value.generators {
             let target = Pos::new(generator.target[0], generator.target[1]);
             let pattern = parse_pattern(&generator.pattern)?;
-            inputs.push(Input::Generator(Generator::new(
+            builder.add_input(Input::Generator(Generator::new(
                 target,
                 pattern,
                 generator.is_loop,
             )));
         }
 
-        let mut outputs = Vec::with_capacity(value.output.len() + value.testers.len());
         for output in value.output {
             match output {
                 OutputJson::Tester {
@@ -137,7 +131,7 @@ impl TryFrom<CircuitJson> for Circuit {
                 } => {
                     let target = Pos::new(target[0], target[1]);
                     let expected = parse_expected_pattern(&expected)?;
-                    outputs.push(Output::Tester(Tester::new(target, expected, is_loop)));
+                    builder.add_output(Output::Tester(Tester::new(target, expected, is_loop)));
                 }
             }
         }
@@ -145,10 +139,10 @@ impl TryFrom<CircuitJson> for Circuit {
         for tester in value.testers {
             let target = Pos::new(tester.target[0], tester.target[1]);
             let expected = parse_expected_pattern(&tester.expected)?;
-            outputs.push(Output::Tester(Tester::new(target, expected, tester.is_loop)));
+            builder.add_output(Output::Tester(Tester::new(target, expected, tester.is_loop)));
         }
 
-        Circuit::with_components(cells, wires, inputs, outputs).map_err(ParseError::from)
+        builder.build().map_err(ParseError::from)
     }
 }
 
