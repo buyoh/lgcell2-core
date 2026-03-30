@@ -3,7 +3,7 @@ use std::io::{self, Read};
 use std::path::PathBuf;
 
 use clap::Parser;
-use lgcell2_core::io::json::{output_json_to_string, parse_circuit_json, simulate_to_output_json};
+use lgcell2_core::parser::json::{output_json_to_string, parse_circuit_json, simulate_to_output_json};
 
 mod view;
 

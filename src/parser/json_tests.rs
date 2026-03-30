@@ -1,4 +1,4 @@
-use crate::io::json::{
+use crate::parser::json::{
     CircuitJson, output_json_to_string, parse_circuit_json, simulate_to_output_json,
 };
 use crate::simulation::{Simulator, SimulatorSimple};
@@ -209,7 +209,7 @@ fn circuit_json_deserializes_legacy_generators_for_compatibility() {
 
 #[test]
 fn parse_expected_pattern_returns_invalid_expected_pattern_char_error() {
-    use crate::io::json::parse_expected_pattern;
+    use crate::parser::json::parse_expected_pattern;
 
     let err = parse_expected_pattern("10a").expect_err("must reject invalid expected pattern");
     assert!(matches!(
@@ -220,14 +220,14 @@ fn parse_expected_pattern_returns_invalid_expected_pattern_char_error() {
 
 #[test]
 fn parse_wire_kind_returns_format_error() {
-    use crate::io::json::parse_wire_kind;
+    use crate::parser::json::parse_wire_kind;
     let err = parse_wire_kind("bad").expect_err("must reject unknown kind");
     assert!(matches!(err, crate::base::FormatError::InvalidWireKind(ref s) if s == "bad"));
 }
 
 #[test]
 fn parse_pattern_returns_invalid_pattern_char_error() {
-    use crate::io::json::parse_pattern;
+    use crate::parser::json::parse_pattern;
     let err = parse_pattern("01a").expect_err("must reject invalid pattern char");
     assert!(matches!(
         err,
@@ -237,7 +237,7 @@ fn parse_pattern_returns_invalid_pattern_char_error() {
 
 #[test]
 fn parse_pattern_returns_error_for_first_invalid_char() {
-    use crate::io::json::parse_pattern;
+    use crate::parser::json::parse_pattern;
     let err = parse_pattern("z10").expect_err("must reject invalid pattern char");
     assert!(matches!(
         err,

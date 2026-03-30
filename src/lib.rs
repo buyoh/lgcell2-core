@@ -1,6 +1,6 @@
 pub mod base;
 pub mod circuit;
-pub mod io;
+pub mod parser;
 #[cfg(feature = "cli")]
 pub mod platform;
 pub mod simulation;

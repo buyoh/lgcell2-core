@@ -2,7 +2,7 @@ use std::collections::BTreeMap;
 
 use lgcell2_core::base::ParseError;
 use lgcell2_core::circuit::{Circuit, CircuitBuilder, Generator, Input, Output, Pos, Tester};
-use lgcell2_core::io::json::{
+use lgcell2_core::parser::json::{
     CircuitJson, InputJson, OutputJson, parse_expected_pattern, parse_pattern, parse_wire_kind,
 };
 use lgcell2_core::simulation::{Simulator, SimulatorSimple};
@@ -290,7 +290,7 @@ pub fn test_validation_case(test_dir: &str) {
     let expected: ExpectedError = serde_json::from_str(&expected_content)
         .unwrap_or_else(|_| panic!("Failed to parse {}", expected_path));
 
-    let result = lgcell2_core::io::json::parse_circuit_json(&circuit_content);
+    let result = lgcell2_core::parser::json::parse_circuit_json(&circuit_content);
     let err = result.expect_err(&format!(
         "Circuit in {} should be rejected, but was accepted",
         test_dir
