@@ -49,13 +49,39 @@
 5. `Simulator::new()` / `with_output_format()` での子 Simulator 再帰構築
 6. `WireSimState` との相互作用の確認（sub_input セルが入力なしセルスロットとして扱われることの検証）
 
-## ステップ 5: テスト
+## ステップ 5: WASM API の対応
+
+詳細: [06-wasm-api.md](06-wasm-api.md)
+
+### 対象ファイル
+- `src/wasm_api/types.rs`: `WasmModuleInput`, `WasmSubCircuitInput` 追加、`WasmCircuitInput` 拡張
+- `src/wasm_api/simulator.rs`: `build_circuit_from_input()` の更新（`WasmCircuitInput` → `CircuitJson` 変換）
+
+### 作業内容
+1. `WasmModuleInput`, `WasmSubCircuitInput` 型を追加
+2. `WasmCircuitInput` に `modules`, `sub_circuits` フィールドを追加
+3. `build_circuit_from_input()` を更新: `WasmCircuitInput` → `CircuitJson` に変換し、既存の `TryFrom<CircuitJson>` を経由
+4. Legacy API（`simulate`, `simulate_n`）は `parse_circuit_json()` 経由のため変更不要
+
+## ステップ 6: View モードのエラーハンドリング
+
+詳細: [05-view.md](05-view.md)
+
+### 対象ファイル
+- `src/bin/lgcell2/view.rs`: `run_view_mode()` にサブ回路チェック追加
+
+### 作業内容
+1. `run_view_mode()` の先頭で `circuit.modules().is_empty()` を検査
+2. サブ回路を含む場合はエラーメッセージを返す
+
+## ステップ 7: テスト
 
 ### 対象ファイル
 - `src/circuit/module_tests.rs`（新規）: ResolvedModule のユニットテスト
 - `src/circuit/circuit_tests.rs`: モジュール付き Circuit の構築テスト
 - `src/io/json_tests.rs`: サブ回路 JSON のパーステスト
 - `src/simulation/engine_tests.rs`: モジュール付きシミュレーションテスト
+- `src/wasm_api/simulator.rs`: サブ回路付きの WASM API テスト
 - `resources/tests/simulation/`（新規テストケース）
 
 ### テストケース
@@ -67,6 +93,9 @@
 - 順序回路サブ回路（フィードバックを含むサブ回路）
 - 入力セル共有（2 つのモジュールが同じ入力セルを参照）
 - サブ回路なしの回路（後方互換性）
+- WASM API: `new()` でサブ回路付き `WasmCircuitInput` からの構築
+- WASM API: `from_json()` でサブ回路付き JSON からの構築
+- WASM API: サブ回路付き回路での `run()`, `run_steps()`, `get_state()`, `get_cell()`
 
 **異常系:**
 - 存在しないサブ回路名を参照
@@ -78,8 +107,10 @@
 - sub_input に入力ワイヤが接続
 - ポート列制約違反（入力ポートが異なる x 座標）
 - ポート列制約違反（y 座標が非連続）
+- View モードでサブ回路を含む回路を拒否
+- WASM API: 不正なサブ回路定義でのエラー
 
-## ステップ 6: ドキュメント更新
+## ステップ 8: ドキュメント更新
 
 ### 対象ファイル
 - `docs/spec/circuit-json.md`: JSON 仕様にサブ回路セクション追加

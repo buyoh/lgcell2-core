@@ -79,3 +79,5 @@
 | [02-data-model.md](02-data-model.md) | データモデルの変更 |
 | [03-simulation.md](03-simulation.md) | シミュレーションエンジンの変更 |
 | [04-steps.md](04-steps.md) | 実装ステップ |
+| [05-view.md](05-view.md) | View モードの対応（エラーハンドリング） |
+| [06-wasm-api.md](06-wasm-api.md) | WASM API の対応 |
