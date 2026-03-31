@@ -1,4 +1,5 @@
-use std::collections::BTreeSet;
+use std::cell::Cell;
+use std::collections::{BTreeSet, HashMap};
 
 use crate::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire, WireKind};
 use crate::simulation::{OutputFormat, Rect, Simulator, SimulatorSimple, StepResult};
@@ -358,4 +359,87 @@ fn is_updating_false_after_tick_complete() {
     let mut sim = SimulatorSimple::new(circuit);
     sim.tick();
     assert!(!sim.is_updating());
+}
+
+#[derive(Debug)]
+struct SnapshotCacheProbeSimulator {
+    circuit: Circuit,
+    tick: u64,
+    last_output: crate::simulation::TickOutput,
+    last_output_calls: Cell<u64>,
+}
+
+impl SnapshotCacheProbeSimulator {
+    fn new() -> Self {
+        let pos = Pos::new(0, 0);
+        let circuit = make_circuit(&[pos], vec![]);
+        Self {
+            circuit,
+            tick: 0,
+            last_output: crate::simulation::TickOutput {
+                tick: 0,
+                cells: HashMap::from([(pos, false)]),
+            },
+            last_output_calls: Cell::new(0),
+        }
+    }
+}
+
+impl Simulator for SnapshotCacheProbeSimulator {
+    fn step(&mut self) -> StepResult {
+        let pos = Pos::new(0, 0);
+        let value = self.tick % 2 == 0;
+        self.last_output = crate::simulation::TickOutput {
+            tick: self.tick,
+            cells: HashMap::from([(pos, value)]),
+        };
+        self.tick += 1;
+        StepResult::TickComplete
+    }
+
+    fn verify_testers(&self) -> Vec<crate::simulation::TesterResult> {
+        Vec::new()
+    }
+
+    fn circuit(&self) -> &Circuit {
+        &self.circuit
+    }
+
+    fn set_cell(&mut self, _pos: Pos, _value: bool) -> Result<(), crate::base::SimulationError> {
+        Ok(())
+    }
+
+    fn last_output(&self) -> &crate::simulation::TickOutput {
+        self.last_output_calls.set(self.last_output_calls.get() + 1);
+        &self.last_output
+    }
+
+    fn replay_tick(&mut self) {}
+
+    fn current_tick(&self) -> u64 {
+        self.tick
+    }
+
+    fn current_cell(&self) -> Option<Pos> {
+        Some(Pos::new(0, 0))
+    }
+
+    fn set_output_format(&mut self, _output_format: OutputFormat) {}
+
+    fn is_updating(&self) -> bool {
+        false
+    }
+}
+
+#[test]
+fn run_with_snapshots_uses_last_output_cache_per_tick() {
+    let mut sim = SnapshotCacheProbeSimulator::new();
+
+    let snapshots = sim.run_with_snapshots(3);
+
+    assert_eq!(snapshots.len(), 3);
+    assert_eq!(snapshots[0].tick, 0);
+    assert_eq!(snapshots[1].tick, 1);
+    assert_eq!(snapshots[2].tick, 2);
+    assert_eq!(sim.last_output_calls.get(), 3);
 }

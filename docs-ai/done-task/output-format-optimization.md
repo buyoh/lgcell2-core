@@ -10,7 +10,7 @@
 - 2026-03-29: phase1 を実装。`Simulator::cell_values()` と `Simulator::get_cell()` を削除し、呼び出し元を `last_output()` ベースに移行した
 - 2026-03-29: phase1 を成立させる前提として `last_output` キャッシュと `replay_tick()` を先行導入した
 - 2026-03-29: `TickOutput.tick` と JSON 出力の tick 番号を completed tick の 0-based インデックスに統一した
-- 2026-03-29: `run_with_snapshots()` を出力キャッシュ clone ベースへ変更し、タスク全体を完了した
+- 2026-04-01: `run_with_snapshots()` が tick ごとに `last_output()` キャッシュを参照することを、専用の回帰テストで固定化した
 
 ## 背景・動機
 
