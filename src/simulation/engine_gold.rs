@@ -7,15 +7,26 @@ use crate::simulation::engine::{OutputFormat, Simulator, StepResult, TesterResul
 use crate::simulation::wire_state::WireSimState;
 
 
-/// 遅延ワイヤベースの中断可能シミュレーションエンジン。
+enum State {
+    /// tick 間の待機状態。全フィールドが整合した状態にある。
+    Idle,
+    /// tick 内の更新処理中。`cell_index > 0` のセルは現 tick の値を持ち、残りは前 tick の値のまま。
+    Updating,
+}
+
+
+/// 中断可能シミュレーションエンジン。
 ///
 /// tick 内の途中状態（`cell_index > 0`）を「更新中」と呼ぶ。
 /// 更新中は一部のフィールドが不完全な値を持つため、
 /// 状態の読み取りには注意が必要。
 #[derive(Debug, Clone)]
-pub struct SimulatorSimple {
+pub struct SimulatorGold {
     /// 回路定義。不変。更新中でも常に有効。
     circuit: Circuit,
+    /// 出力形式の設定。不変（set_output_format で変更可能）。更新中でも常に有効。
+    output_format: OutputFormat,
+
     /// 遅延ワイヤおよび入力なしセルの前 tick 値。
     /// 更新中: 前 tick の値を保持（現 tick の step() で読み取られる）。
     /// complete_tick() で現 tick の値に更新される。
@@ -39,17 +50,10 @@ pub struct SimulatorSimple {
     /// 更新中: 前回の complete_tick() 時点の出力を保持しており、現 tick の途中経過は反映されない。
     /// complete_tick() で現 tick の最終値から再構築される。
     last_output: TickOutput,
-    /// 出力形式の設定。不変（set_output_format で変更可能）。更新中でも常に有効。
-    output_format: OutputFormat,
 
-
-    /// feedback 辺のdestとなるセルのインデックスセット。
-    /// 回路変更以降は不変。更新中でも常に有効。
-    // TODO: このセルたちが状態を持つ。
-    stateful_cells: Vec<usize>,
 }
 
-impl SimulatorSimple {
+impl SimulatorGold {
     /// AllCell 形式でシミュレータを構築する。
     /// 構築直後は更新完了状態（`is_updating() == false`）。
     pub fn new(circuit: Circuit) -> Self {
@@ -163,7 +167,7 @@ impl SimulatorSimple {
     }
 }
 
-impl Simulator for SimulatorSimple {
+impl Simulator for SimulatorGold {
     fn step(&mut self) -> StepResult {
         if self.cell_index == 0 {
             self.apply_inputs();
