@@ -1,0 +1,24 @@
+{
+  "ticks": 1,
+  "cases": [
+    {
+      "name": "both_false",
+      "expected": { "1,0": true, "3,0": false }
+    },
+    {
+      "name": "both_true",
+      "initial": { "0,0": true, "2,0": true },
+      "expected": { "1,0": false, "3,0": true }
+    },
+    {
+      "name": "a_true_b_false",
+      "initial": { "0,0": true },
+      "expected": { "1,0": false, "3,0": false }
+    },
+    {
+      "name": "a_false_b_true",
+      "initial": { "2,0": true },
+      "expected": { "1,0": true, "3,0": true }
+    }
+  ]
+}

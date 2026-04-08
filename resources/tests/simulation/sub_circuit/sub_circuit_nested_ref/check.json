@@ -1,0 +1,14 @@
+{
+  "ticks": 1,
+  "cases": [
+    {
+      "name": "false_double_inverted",
+      "expected": { "1,0": false }
+    },
+    {
+      "name": "true_double_inverted",
+      "initial": { "0,0": true },
+      "expected": { "1,0": true }
+    }
+  ]
+}

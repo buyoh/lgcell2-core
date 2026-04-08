@@ -1,0 +1,57 @@
+{
+  "wires": [],
+  "modules": [
+    {
+      "type": "sub",
+      "sub_circuit": "a_inv",
+      "input": [[0, 0]],
+      "output": [[1, 0]]
+    },
+    {
+      "type": "sub",
+      "sub_circuit": "b_buf",
+      "input": [[2, 0]],
+      "output": [[3, 0]]
+    }
+  ],
+  "subs": {
+    "c_not": {
+      "wires": [{ "src": [0, 0], "dst": [1, 0], "kind": "negative" }],
+      "sub_input": [[0, 0]],
+      "sub_output": [[1, 0]],
+      "modules": []
+    },
+    "a_inv": {
+      "wires": [],
+      "sub_input": [[0, 0]],
+      "sub_output": [[1, 0]],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "c_not",
+          "input": [[0, 0]],
+          "output": [[1, 0]]
+        }
+      ]
+    },
+    "b_buf": {
+      "wires": [],
+      "sub_input": [[0, 0]],
+      "sub_output": [[3, 0]],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "c_not",
+          "input": [[0, 0]],
+          "output": [[1, 0]]
+        },
+        {
+          "type": "sub",
+          "sub_circuit": "c_not",
+          "input": [[1, 0]],
+          "output": [[3, 0]]
+        }
+      ]
+    }
+  }
+}

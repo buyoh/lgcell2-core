@@ -139,6 +139,16 @@ tests:
     path: simulation/sub_circuit/sub_circuit_two_instances
     comment: "同一サブ回路を2回インスタンス化し独立動作を確認"
 
+  - name: sub_circuit_nested_ref
+    type: simulation
+    path: simulation/sub_circuit/sub_circuit_nested_ref
+    comment: "サブ回路が別のサブ回路を参照するネスト構造"
+
+  - name: sub_circuit_shared_dep
+    type: simulation
+    path: simulation/sub_circuit/sub_circuit_shared_dep
+    comment: "2つのサブ回路A,Bが共通のサブ回路Cを参照"
+
   # === サブ回路解析エラーテスト ===
   - name: validation_sub_circuit_not_found
     type: parse_error
