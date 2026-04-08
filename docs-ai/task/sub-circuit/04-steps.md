@@ -1,6 +1,6 @@
 # 実装ステップ
 
-## ステップ 1: データモデルの追加
+## ステップ 1: データモデルの追加 ✅
 
 ### 対象ファイル
 - `src/circuit/module.rs`（新規）: `ResolvedModule` 型
@@ -8,20 +8,20 @@
 - `src/base/error.rs`: サブ回路関連のエラーバリアント追加
 
 ### 作業内容
-1. `ResolvedModule` 構造体を定義（アクセサのみ、ロジックなし）
-2. `CircuitError` に `ModuleOutputHasIncomingWires`, `DuplicateModuleOutput`, `ModuleOutputBeforeInput`, `InvalidPortColumn`, `SubInputCountMismatch`, `SubOutputCountMismatch`, `SubOutputBeforeSubInput`, `SubInputHasIncomingWires` を追加
-3. `ParseError` に `SubCircuitNotFound`, `CircularDependency` を追加
+1. ✅ `ResolvedModule` 構造体を定義（アクセサのみ、ロジックなし）
+2. ✅ `CircuitError` に `ModuleOutputHasIncomingWires`, `DuplicateModuleOutput`, `ModuleOutputBeforeInput`, `InvalidPortColumn`, `SubInputCountMismatch`, `SubOutputCountMismatch`, `SubOutputBeforeSubInput`, `SubInputHasIncomingWires` を追加
+3. ✅ `ParseError` に `SubCircuitNotFound`, `CircularDependency` を追加
 
-## ステップ 2: Circuit の拡張
+## ステップ 2: Circuit の拡張 ✅
 
 ### 対象ファイル
 - `src/circuit/circuit.rs`: `modules` フィールドと `with_modules` コンストラクタ
 
 ### 作業内容
-1. `Circuit` に `modules: Vec<ResolvedModule>` フィールドを追加
-2. `Circuit::with_modules()` コンストラクタを追加（既存 `with_components` を拡張）
-3. モジュール出力セルの検証ロジック（入力ワイヤ禁止、重複禁止、ポート列制約）
-4. 既存テストが通ることを確認（`modules` が空の場合に既存動作が変わらない）
+1. ✅ `Circuit` に `modules: Vec<ResolvedModule>` フィールドを追加
+2. ✅ `Circuit::with_modules()` コンストラクタを追加（既存 `with_components` を拡張）
+3. ✅ モジュール出力セルの検証ロジック（入力ワイヤ禁止、重複禁止、ポート列制約）
+4. ✅ 既存テストが通ることを確認（`modules` が空の場合に既存動作が変わらない）
 
 ## ステップ 3: JSON パース（サブ回路解決）
 

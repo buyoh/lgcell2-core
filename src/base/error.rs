@@ -33,6 +33,30 @@ pub enum CircuitError {
 
     #[error("tester expected pattern must not be empty: {0}")]
     EmptyTesterPattern(crate::base::Pos),
+
+    #[error("module output {0} must not have incoming wires")]
+    ModuleOutputHasIncomingWires(crate::base::Pos),
+
+    #[error("duplicate module output: {0}")]
+    DuplicateModuleOutput(crate::base::Pos),
+
+    #[error("module output must come after all module inputs in lexicographic order")]
+    ModuleOutputBeforeInput,
+
+    #[error("port column constraint violated: ports must share same x and have contiguous y")]
+    InvalidPortColumn,
+
+    #[error("sub_input count mismatch: expected {expected}, got {actual}")]
+    SubInputCountMismatch { expected: usize, actual: usize },
+
+    #[error("sub_output count mismatch: expected {expected}, got {actual}")]
+    SubOutputCountMismatch { expected: usize, actual: usize },
+
+    #[error("sub_output must come after all sub_input in lexicographic order")]
+    SubOutputBeforeSubInput,
+
+    #[error("sub_input {0} must not have incoming wires within sub-circuit")]
+    SubInputHasIncomingWires(crate::base::Pos),
 }
 
 /// Errors that occur during format conversion (wire kind, pattern, etc.).
@@ -59,6 +83,12 @@ pub enum ParseError {
 
     #[error(transparent)]
     Circuit(#[from] CircuitError),
+
+    #[error("sub-circuit not found: {0}")]
+    SubCircuitNotFound(String),
+
+    #[error("circular dependency detected in sub-circuits: {0}")]
+    CircularDependency(String),
 }
 
 /// Errors that occur during simulation execution.
