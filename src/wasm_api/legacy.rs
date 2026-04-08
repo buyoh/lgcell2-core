@@ -1,6 +1,6 @@
 use wasm_bindgen::prelude::*;
 
-use crate::io::json::{output_json_to_string, parse_circuit_json, simulate_to_output_json};
+use crate::parser::json::{output_json_to_string, parse_circuit_json, simulate_to_output_json};
 
 /// 回路 JSON をシミュレーションし、出力履歴 JSON を返す。
 ///

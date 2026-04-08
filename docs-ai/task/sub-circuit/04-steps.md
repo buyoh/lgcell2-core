@@ -60,21 +60,23 @@
 ### 修正した不具合
 - モジュール出力セルが `Circuit::with_components()` のワイヤ・エンドポイント検証前に `cells` に含まれていなかったため `WireSrcNotFound` が発生 → `with_modules()` でセル挿入を先に行うよう修正
 
-## ステップ 5: WASM API の対応
+## ステップ 5: WASM API の対応 ✅
 
 詳細: [06-wasm-api.md](06-wasm-api.md)
 
 ### 対象ファイル
 - `src/wasm_api/types.rs`: `WasmModuleInput`, `WasmSubCircuitInput` 追加、`WasmCircuitInput` 拡張
 - `src/wasm_api/simulator.rs`: `build_circuit_from_input()` の更新（`WasmCircuitInput` → `CircuitJson` 変換）
+- `src/wasm_api/legacy.rs`: parser モジュール参照へ更新
 
 ### 作業内容
-1. `WasmModuleInput`, `WasmSubCircuitInput` 型を追加
-2. `WasmCircuitInput` に `modules`, `sub_circuits` フィールドを追加
-3. `build_circuit_from_input()` を更新: `WasmCircuitInput` → `CircuitJson` に変換し、既存の `TryFrom<CircuitJson>` を経由
-4. Legacy API（`simulate`, `simulate_n`）は `parse_circuit_json()` 経由のため変更不要
+1. ✅ `WasmModuleInput`, `WasmSubCircuitInput` 型を追加
+2. ✅ `WasmCircuitInput` に `modules`, `sub_circuits` フィールドを追加
+3. ✅ `build_circuit_from_input()` を更新: `WasmCircuitInput` → `CircuitJson` に変換し、既存の `TryFrom<CircuitJson>` を経由
+4. ✅ `legacy.rs` / `simulator.rs` の JSON 関連 import を `parser::json` に統一
+5. ✅ WASM API テストを拡張（サブ回路の `new` / `from_json` 正常系、`run` による出力検証、異常系 2 件）
 
-## ステップ 6: View モードのエラーハンドリング
+## ステップ 6: View モードのエラーハンドリング ✅
 
 詳細: [05-view.md](05-view.md)
 
@@ -82,18 +84,24 @@
 - `src/bin/lgcell2/view.rs`: `run_view_mode()` にサブ回路チェック追加
 
 ### 作業内容
-1. `run_view_mode()` の先頭で `circuit.modules().is_empty()` を検査
-2. サブ回路を含む場合はエラーメッセージを返す
+1. ✅ `run_view_mode()` の先頭で `circuit.modules().is_empty()` を検査
+2. ✅ サブ回路を含む場合はエラーメッセージを返す
+3. ✅ `src/bin/lgcell2/view_tests.rs` に拒否テストを追加
 
-## ステップ 7: テスト
+## ステップ 7: テスト ✅
 
 ### 対象ファイル
 - `src/circuit/module_tests.rs`（新規）: ResolvedModule のユニットテスト
 - `src/circuit/circuit_tests.rs`: モジュール付き Circuit の構築テスト
-- `src/io/json_tests.rs`: サブ回路 JSON のパーステスト
+- `src/parser/json_tests.rs`: サブ回路 JSON のパーステスト
 - `src/simulation/engine_tests.rs`: モジュール付きシミュレーションテスト
 - `src/wasm_api/simulator.rs`: サブ回路付きの WASM API テスト
 - `resources/tests/simulation/`（新規テストケース）
+
+### 実施結果
+- ✅ 既存の Step1-4 テスト群に加えて、Step5-7 で WASM API / View モードのテストを追加
+- ✅ `cargo test`（default）: 147 tests passed
+- ✅ `cargo test --features wasm`: 165 tests passed（107 + 7 + 51）
 
 ### テストケース
 

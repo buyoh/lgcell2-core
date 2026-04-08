@@ -6,6 +6,7 @@ mod tests {
     use std::time::Duration;
 
     use lgcell2_core::circuit::{Circuit, Pos};
+    use lgcell2_core::parser::json::parse_circuit_json;
     use lgcell2_core::platform::console::{Console, KeyInput};
 
     use crate::view::run_view_loop_with_config;
@@ -200,5 +201,34 @@ mod tests {
         let console = StubConsole::new((20, 4), vec![Some(KeyInput::Char('q'))]);
         let result = crate::view::run_view_loop(console, single_cell_circuit());
         assert!(result.is_ok());
+    }
+
+    #[test]
+    fn run_view_mode_rejects_circuit_with_modules() {
+        let json = r#"{
+            "wires":[],
+            "modules":[{
+                "type":"sub",
+                "sub_circuit":"inverter",
+                "input":[[2,0]],
+                "output":[[3,0]]
+            }],
+            "subs":{
+                "inverter":{
+                    "wires":[{"src":[0,0],"dst":[1,0],"kind":"negative"}],
+                    "sub_input":[[0,0]],
+                    "sub_output":[[1,0]],
+                    "modules":[]
+                }
+            }
+        }"#;
+
+        let circuit = parse_circuit_json(json).expect("module circuit should parse");
+        let result = crate::view::run_view_mode(circuit);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err(),
+            "view mode does not support circuits with sub-circuit modules"
+        );
     }
 }

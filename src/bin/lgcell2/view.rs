@@ -9,6 +9,9 @@ const TICK_INTERVAL: Duration = Duration::from_millis(200);
 
 /// ビューモードのエントリポイント。
 pub fn run_view_mode(circuit: Circuit) -> Result<(), String> {
+    if !circuit.modules().is_empty() {
+        return Err("view mode does not support circuits with sub-circuit modules".to_string());
+    }
     let console = CrosstermConsole::new();
     run_view_loop(console, circuit)
 }

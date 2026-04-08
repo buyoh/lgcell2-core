@@ -1,12 +1,15 @@
 use wasm_bindgen::prelude::*;
 
 use crate::base::SimulationError;
-use crate::circuit::{Circuit, CircuitBuilder, Generator, Input, Pos, WireKind};
-use crate::io::json::{parse_circuit_json, parse_pattern};
+use crate::circuit::{Circuit, Pos};
+use crate::parser::json::{
+    parse_circuit_json, CircuitJson, InputJson, ModuleJson, SubCircuitJson, WireJson,
+};
 use crate::simulation::{SimulatorSimple, Simulator, StepResult};
 
 use super::types::{
-    WasmCellState, WasmCircuitInput, WasmStepRunResult, WasmTickResult, WasmWireKind,
+    WasmCellState, WasmCircuitInput, WasmModuleInput, WasmStepRunResult, WasmSubCircuitInput,
+    WasmTickResult, WasmWireKind,
 };
 
 /// JavaScript から利用可能なステートフルシミュレータ。
@@ -130,31 +133,94 @@ impl WasmSimulator {
 
 /// `WasmCircuitInput` から内部 `Circuit` を構築する。
 fn build_circuit_from_input(input: WasmCircuitInput) -> Result<Circuit, crate::base::ParseError> {
-    let mut builder = CircuitBuilder::new();
+    let circuit_json = convert_to_circuit_json(input);
+    Circuit::try_from(circuit_json)
+}
 
-    for wire_input in input.wires {
-        let src = Pos::new(wire_input.src[0], wire_input.src[1]);
-        let dst = Pos::new(wire_input.dst[0], wire_input.dst[1]);
-        let kind = match wire_input.kind {
-            WasmWireKind::Positive => WireKind::Positive,
-            WasmWireKind::Negative => WireKind::Negative,
-        };
-        builder.add_wire(src, dst, kind);
+fn convert_to_circuit_json(input: WasmCircuitInput) -> CircuitJson {
+    let wires = input
+        .wires
+        .into_iter()
+        .map(|wire| WireJson {
+            src: wire.src,
+            dst: wire.dst,
+            kind: match wire.kind {
+                WasmWireKind::Positive => "positive".to_string(),
+                WasmWireKind::Negative => "negative".to_string(),
+            },
+        })
+        .collect();
+
+    let input_components = input
+        .generators
+        .into_iter()
+        .map(|generator| InputJson::Generator {
+            target: generator.target,
+            pattern: generator.pattern,
+            is_loop: generator.is_loop,
+        })
+        .collect();
+
+    let modules = input
+        .modules
+        .into_iter()
+        .map(convert_module)
+        .collect();
+
+    let subs = input
+        .sub_circuits
+        .into_iter()
+        .map(|(name, sub)| (name, convert_sub_circuit(sub)))
+        .collect();
+
+    CircuitJson {
+        wires,
+        input: input_components,
+        output: Vec::new(),
+        generators: Vec::new(),
+        testers: Vec::new(),
+        modules,
+        subs,
     }
+}
 
-    for gen_input in input.generators {
-        let target = Pos::new(gen_input.target[0], gen_input.target[1]);
-        let pattern = parse_pattern(&gen_input.pattern).map_err(crate::base::ParseError::from)?;
-        builder.add_input(Input::Generator(Generator::new(target, pattern, gen_input.is_loop)));
+fn convert_module(module: WasmModuleInput) -> ModuleJson {
+    ModuleJson {
+        module_type: module.module_type,
+        sub_circuit: module.sub_circuit,
+        input: module.input,
+        output: module.output,
     }
+}
 
-    builder.build().map_err(crate::base::ParseError::from)
+fn convert_sub_circuit(sub: WasmSubCircuitInput) -> SubCircuitJson {
+    SubCircuitJson {
+        wires: sub
+            .wires
+            .into_iter()
+            .map(|wire| WireJson {
+                src: wire.src,
+                dst: wire.dst,
+                kind: match wire.kind {
+                    WasmWireKind::Positive => "positive".to_string(),
+                    WasmWireKind::Negative => "negative".to_string(),
+                },
+            })
+            .collect(),
+        sub_input: sub.sub_input,
+        sub_output: sub.sub_output,
+        modules: sub.modules.into_iter().map(convert_module).collect(),
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use super::*;
-    use crate::wasm_api::types::{WasmWireInput, WasmWireKind};
+    use crate::wasm_api::types::{
+        WasmModuleInput, WasmSubCircuitInput, WasmWireInput, WasmWireKind,
+    };
 
     fn make_simple_input() -> WasmCircuitInput {
         WasmCircuitInput {
@@ -164,6 +230,37 @@ mod tests {
                 kind: WasmWireKind::Positive,
             }],
             generators: vec![],
+            modules: vec![],
+            sub_circuits: HashMap::new(),
+        }
+    }
+
+    fn make_inverter_sub_input() -> WasmCircuitInput {
+        let mut sub_circuits = HashMap::new();
+        sub_circuits.insert(
+            "inverter".to_string(),
+            WasmSubCircuitInput {
+                wires: vec![WasmWireInput {
+                    src: [0, 0],
+                    dst: [1, 0],
+                    kind: WasmWireKind::Negative,
+                }],
+                sub_input: vec![[0, 0]],
+                sub_output: vec![[1, 0]],
+                modules: vec![],
+            },
+        );
+
+        WasmCircuitInput {
+            wires: vec![],
+            generators: vec![],
+            modules: vec![WasmModuleInput {
+                module_type: "sub".to_string(),
+                sub_circuit: Some("inverter".to_string()),
+                input: vec![[2, 0]],
+                output: vec![[3, 0]],
+            }],
+            sub_circuits,
         }
     }
 
@@ -257,6 +354,104 @@ mod tests {
         let mut sim = WasmSimulator::new(input).unwrap();
         sim.set_cell(0, 0, true).unwrap();
         assert_eq!(sim.get_cell(0, 0), Some(true));
+    }
+
+    #[test]
+    fn new_supports_sub_circuit_modules() {
+        let input = make_inverter_sub_input();
+        let result = WasmSimulator::new(input);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn from_json_supports_sub_circuit_modules() {
+        let json = r#"{
+            "wires":[],
+            "modules":[{
+                "type":"sub",
+                "sub_circuit":"inverter",
+                "input":[[2,0]],
+                "output":[[3,0]]
+            }],
+            "subs":{
+                "inverter":{
+                    "wires":[{"src":[0,0],"dst":[1,0],"kind":"negative"}],
+                    "sub_input":[[0,0]],
+                    "sub_output":[[1,0]],
+                    "modules":[]
+                }
+            }
+        }"#;
+        let result = WasmSimulator::from_json(json);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn run_with_sub_module_reflects_output_cell() {
+        let input = make_inverter_sub_input();
+        let mut sim = WasmSimulator::new(input).unwrap();
+        sim.set_cell(2, 0, false).unwrap();
+        sim.run(1);
+        assert_eq!(sim.get_cell(3, 0), Some(true));
+    }
+
+    #[test]
+    fn new_rejects_unknown_sub_circuit() {
+        let input = WasmCircuitInput {
+            wires: vec![],
+            generators: vec![],
+            modules: vec![WasmModuleInput {
+                module_type: "sub".to_string(),
+                sub_circuit: Some("missing_sub".to_string()),
+                input: vec![[0, 0]],
+                output: vec![[1, 0]],
+            }],
+            sub_circuits: HashMap::new(),
+        };
+
+        let result = build_circuit_from_input(input);
+        assert!(matches!(
+            result,
+            Err(crate::base::ParseError::SubCircuitNotFound(_))
+        ));
+    }
+
+    #[test]
+    fn new_rejects_sub_input_count_mismatch() {
+        let mut sub_circuits = HashMap::new();
+        sub_circuits.insert(
+            "inverter".to_string(),
+            WasmSubCircuitInput {
+                wires: vec![WasmWireInput {
+                    src: [0, 0],
+                    dst: [1, 0],
+                    kind: WasmWireKind::Negative,
+                }],
+                sub_input: vec![[0, 0]],
+                sub_output: vec![[1, 0]],
+                modules: vec![],
+            },
+        );
+
+        let input = WasmCircuitInput {
+            wires: vec![],
+            generators: vec![],
+            modules: vec![WasmModuleInput {
+                module_type: "sub".to_string(),
+                sub_circuit: Some("inverter".to_string()),
+                input: vec![[2, 0], [2, 1]],
+                output: vec![[3, 0]],
+            }],
+            sub_circuits,
+        };
+
+        let result = build_circuit_from_input(input);
+        assert!(matches!(
+            result,
+            Err(crate::base::ParseError::Circuit(
+                crate::base::CircuitError::SubInputCountMismatch { .. }
+            ))
+        ));
     }
 
     #[cfg(target_arch = "wasm32")]

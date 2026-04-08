@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 use tsify_next::Tsify;
 
@@ -8,6 +10,32 @@ pub struct WasmCircuitInput {
     pub wires: Vec<WasmWireInput>,
     #[serde(default)]
     pub generators: Vec<WasmGeneratorInput>,
+    #[serde(default)]
+    pub modules: Vec<WasmModuleInput>,
+    #[serde(default)]
+    pub sub_circuits: HashMap<String, WasmSubCircuitInput>,
+}
+
+/// モジュールインスタンス入力。
+#[derive(Debug, Deserialize, Tsify)]
+#[tsify(from_wasm_abi)]
+pub struct WasmModuleInput {
+    #[serde(rename = "type")]
+    pub module_type: String,
+    pub sub_circuit: Option<String>,
+    pub input: Vec<[i32; 2]>,
+    pub output: Vec<[i32; 2]>,
+}
+
+/// サブ回路定義入力。
+#[derive(Debug, Deserialize, Tsify)]
+#[tsify(from_wasm_abi)]
+pub struct WasmSubCircuitInput {
+    pub wires: Vec<WasmWireInput>,
+    pub sub_input: Vec<[i32; 2]>,
+    pub sub_output: Vec<[i32; 2]>,
+    #[serde(default)]
+    pub modules: Vec<WasmModuleInput>,
 }
 
 /// ワイヤ入力。
