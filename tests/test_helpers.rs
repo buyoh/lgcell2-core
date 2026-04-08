@@ -1,9 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use lgcell2_core::base::ParseError;
-use lgcell2_core::circuit::{Circuit, CircuitBuilder, Generator, Input, Output, Pos, Tester};
+use lgcell2_core::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire};
 use lgcell2_core::parser::json::{
-    CircuitJson, InputJson, OutputJson, parse_expected_pattern, parse_pattern, parse_wire_kind,
+    parse_circuit_json, CircuitJson, InputJson, OutputJson, parse_expected_pattern, parse_pattern,
+    parse_wire_kind,
 };
 use lgcell2_core::simulation::{Simulator, SimulatorSimple};
 
@@ -91,13 +92,19 @@ pub fn test_simulation_case(test_dir: &str, case_name: &str) {
         });
 
     // 3. circuit.json の input と case.input を target 単位でマージ
-    let circuit = build_circuit_with_case_inputs(
-        &circuit_json,
-        &test_case.input,
-        &test_case.output,
-        &test_case.generators,
-    )
-    .unwrap_or_else(|e| panic!("Failed to build circuit for test case {}: {}", case_name, e));
+    // サブ回路モジュールを含む場合は parse_circuit_json 経由で構築
+    let circuit = if !circuit_json.modules.is_empty() || !circuit_json.subs.is_empty() {
+        parse_circuit_json(&circuit_content)
+            .unwrap_or_else(|e| panic!("Failed to parse circuit for test case {}: {}", case_name, e))
+    } else {
+        build_circuit_with_case_inputs(
+            &circuit_json,
+            &test_case.input,
+            &test_case.output,
+            &test_case.generators,
+        )
+        .unwrap_or_else(|e| panic!("Failed to build circuit for test case {}: {}", case_name, e))
+    };
 
     // 4. Simulator を作成して初期値を設定
     let mut sim = SimulatorSimple::new(circuit);
@@ -143,13 +150,17 @@ fn build_circuit_with_case_inputs(
     case_outputs: &[OutputCaseJson],
     case_generators: &[GeneratorJson],
 ) -> Result<Circuit, ParseError> {
-    let mut builder = CircuitBuilder::new();
+    let mut cells = BTreeSet::new();
+    let mut wires = Vec::with_capacity(circuit_json.wires.len());
 
     for wire in &circuit_json.wires {
         let src = Pos::new(wire.src[0], wire.src[1]);
         let dst = Pos::new(wire.dst[0], wire.dst[1]);
         let kind = parse_wire_kind(&wire.kind)?;
-        builder.add_wire(src, dst, kind);
+
+        cells.insert(src);
+        cells.insert(dst);
+        wires.push(Wire::new(src, dst, kind));
     }
 
     let mut inputs_by_target: BTreeMap<Pos, Input> = BTreeMap::new();
@@ -252,15 +263,7 @@ fn build_circuit_with_case_inputs(
 
     let inputs = inputs_by_target.into_values().collect::<Vec<_>>();
     let outputs = outputs_by_target.into_values().collect::<Vec<_>>();
-
-    for input in inputs {
-        builder.add_input(input);
-    }
-    for output in outputs {
-        builder.add_output(output);
-    }
-
-    builder.build().map_err(ParseError::from)
+    Circuit::with_components(cells, wires, inputs, outputs).map_err(ParseError::from)
 }
 
 fn parse_pos(pos_str: &str) -> Pos {
@@ -290,7 +293,7 @@ pub fn test_validation_case(test_dir: &str) {
     let expected: ExpectedError = serde_json::from_str(&expected_content)
         .unwrap_or_else(|_| panic!("Failed to parse {}", expected_path));
 
-    let result = lgcell2_core::parser::json::parse_circuit_json(&circuit_content);
+    let result = parse_circuit_json(&circuit_content);
     let err = result.expect_err(&format!(
         "Circuit in {} should be rejected, but was accepted",
         test_dir

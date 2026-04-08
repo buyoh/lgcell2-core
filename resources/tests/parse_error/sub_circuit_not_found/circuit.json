@@ -1,0 +1,12 @@
+{
+  "wires": [],
+  "modules": [
+    {
+      "type": "sub",
+      "sub_circuit": "nonexistent",
+      "input": [[0, 0]],
+      "output": [[1, 0]]
+    }
+  ],
+  "subs": {}
+}

@@ -1,0 +1,28 @@
+{
+  "wires": [
+    { "src": [0, 0], "dst": [1, 0], "kind": "positive" },
+    { "src": [0, 0], "dst": [3, 0], "kind": "positive" }
+  ],
+  "modules": [
+    {
+      "type": "sub",
+      "sub_circuit": "inverter",
+      "input": [[1, 0]],
+      "output": [[2, 0]]
+    },
+    {
+      "type": "sub",
+      "sub_circuit": "inverter",
+      "input": [[3, 0]],
+      "output": [[4, 0]]
+    }
+  ],
+  "subs": {
+    "inverter": {
+      "wires": [{ "src": [0, 0], "dst": [1, 0], "kind": "negative" }],
+      "sub_input": [[0, 0]],
+      "sub_output": [[1, 0]],
+      "modules": []
+    }
+  }
+}

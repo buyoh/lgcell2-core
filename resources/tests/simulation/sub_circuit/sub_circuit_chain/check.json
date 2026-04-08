@@ -1,0 +1,14 @@
+{
+  "ticks": 1,
+  "cases": [
+    {
+      "name": "false_propagates_inverted_then_forward",
+      "expected": { "3,0": true, "4,0": true }
+    },
+    {
+      "name": "true_propagates_inverted_then_forward",
+      "initial": { "1,0": true },
+      "expected": { "3,0": false, "4,0": false }
+    }
+  ]
+}
