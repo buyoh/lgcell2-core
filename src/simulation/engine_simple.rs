@@ -1,13 +1,11 @@
-
 use std::collections::HashMap;
 
 use crate::base::SimulationError;
 use crate::circuit::{Circuit, InputComponent, Output, Pos};
 use crate::simulation::engine::{OutputFormat, Simulator, StepResult, TesterResult, TickOutput};
-use crate::simulation::wire_state::WireSimState;
 
 
-/// 遅延ワイヤベースの中断可能シミュレーションエンジン。
+/// 中断可能シミュレーションエンジン。
 ///
 /// tick 内の途中状態（`cell_index > 0`）を「更新中」と呼ぶ。
 /// 更新中は一部のフィールドが不完全な値を持つため、
@@ -16,30 +14,15 @@ use crate::simulation::wire_state::WireSimState;
 pub struct SimulatorSimple {
     /// 回路定義。不変。更新中でも常に有効。
     circuit: Circuit,
-    /// 遅延ワイヤおよび入力なしセルの前 tick 値。
-    /// 更新中: 前 tick の値を保持（現 tick の step() で読み取られる）。
-    /// complete_tick() で現 tick の値に更新される。
-    wire_state: WireSimState,
+    /// 前 tick の全セル値。sorted_cells() と同じ順序でインデックスされる。
+    prev_cell_values: Vec<bool>,
     /// 全セルの現在値。sorted_cells() と同じ順序でインデックスされる。
-    /// 更新中: インデックス `< cell_index` のセルは現 tick の計算済み値、
-    ///         `>= cell_index` のセルは前 tick の値のまま。
-    /// complete_tick() 完了後は全セルが現 tick の値を持つ。
     cell_values: Vec<bool>,
-    /// Pos → cell_values インデックスの逆引きマップ。不変。更新中でも常に有効。
+    /// Pos → cell_values インデックスの逆引きマップ。不変。
     cell_pos_to_index: HashMap<Pos, usize>,
-    /// 完了した tick 数（0-based の次 tick 番号）。
-    /// 更新中: 現在処理中の tick の番号を保持。complete_tick() でインクリメントされる。
     tick: u64,
-    /// 現在 tick 内で次に処理するセルのインデックス。
-    /// 0 = tick 間の待機状態（更新完了）。
-    /// 1 以上 = tick 内の更新中。
-    /// complete_tick() で 0 にリセットされる。
     cell_index: usize,
-    /// 直近の完了 tick の出力キャッシュ。
-    /// 更新中: 前回の complete_tick() 時点の出力を保持しており、現 tick の途中経過は反映されない。
-    /// complete_tick() で現 tick の最終値から再構築される。
     last_output: TickOutput,
-    /// 出力形式の設定。不変（set_output_format で変更可能）。更新中でも常に有効。
     output_format: OutputFormat,
 }
 
@@ -80,8 +63,8 @@ impl SimulatorSimple {
         };
 
         Self {
-            wire_state: WireSimState::from_circuit(&circuit),
             circuit,
+            prev_cell_values: vec![false; cell_count],
             cell_values: vec![false; cell_count],
             cell_pos_to_index,
             tick: 0,
@@ -102,27 +85,7 @@ impl SimulatorSimple {
     }
 
     fn complete_tick(&mut self) {
-        for (wire_index, wire) in self.circuit.wires().iter().enumerate() {
-            if wire.dst < wire.src {
-                let src_idx = self.cell_pos_to_index[&wire.src];
-                self.wire_state
-                    .update_wire(wire_index, self.cell_values[src_idx]);
-            }
-        }
-
-        for (cell_idx, &pos) in self.circuit.sorted_cells().iter().enumerate() {
-            if self.circuit.incoming_indices(pos).is_empty()
-                && !self
-                    .circuit
-                    .inputs()
-                    .iter()
-                    .any(|input| input.target() == pos)
-            {
-                self.wire_state
-                    .update_cell(cell_idx, self.cell_values[cell_idx]);
-            }
-        }
-
+        self.prev_cell_values.copy_from_slice(&self.cell_values);
         // Bug fix: last_output used to be rebuilt after tick increment, which made snapshot
         // numbering 1-based and disconnected from verify_testers(). Rebuilding here keeps both
         // the cache and the completed tick index aligned.
@@ -168,19 +131,18 @@ impl Simulator for SimulatorSimple {
         let incoming = self.circuit.incoming_indices(cell);
 
         if incoming.is_empty() {
-            if let Some(value) = self.wire_state.get_stateless_cell(cell_idx) {
-                self.cell_values[cell_idx] = value;
+            // 入力コンポーネント対象セルは apply_inputs() で既に値が設定されている。
+            // それ以外の入力なしセルのみ前 tick の値を引き継ぐ。
+            if !self.circuit.inputs().iter().any(|i| i.target() == cell) {
+                self.cell_values[cell_idx] = self.prev_cell_values[cell_idx];
             }
         } else {
             let mut next_value = false;
             for &wire_index in incoming {
                 let wire = &self.circuit.wires()[wire_index];
                 let src_value = if wire.dst < wire.src {
-                    // 遅延ワイヤには Circuit 構築時に必ずスロットが割り当てられる不変条件に依存している。
-                    // リリースビルドでは unwrap_or(false) でフォールバックし、デバッグビルドで検出する。
-                    let delayed_value = self.wire_state.get_delayed_wire(wire_index);
-                    debug_assert!(delayed_value.is_some(), "delayed wire must have slot");
-                    delayed_value.unwrap_or(false)
+                    let src_idx = self.cell_pos_to_index[&wire.src];
+                    self.prev_cell_values[src_idx]
                 } else {
                     let src_idx = self.cell_pos_to_index[&wire.src];
                     self.cell_values[src_idx]
@@ -242,10 +204,6 @@ impl Simulator for SimulatorSimple {
     }
 
     /// 指定セルの値を更新する。
-    ///
-    /// `cell_values`、`wire_state`、`last_output` を即時更新する。
-    /// 更新中に呼び出した場合、注入した値がその後の step() で上書きされる可能性がある。
-    /// 更新完了状態で呼び出すことを推奨。
     fn set_cell(&mut self, pos: Pos, value: bool) -> Result<(), SimulationError> {
         let index = self
             .cell_pos_to_index
@@ -253,16 +211,8 @@ impl Simulator for SimulatorSimple {
             .copied()
             .ok_or(SimulationError::UnknownCell(pos))?;
         self.cell_values[index] = value;
-        self.wire_state.update_cell(index, value);
+        self.prev_cell_values[index] = value;
 
-        for (wire_index, wire) in self.circuit.wires().iter().enumerate() {
-            if wire.src == pos && wire.dst < wire.src {
-                self.wire_state.update_wire(wire_index, value);
-            }
-        }
-
-        // Bug fix: callers switched from direct cell accessors to last_output(), so injected
-        // values must immediately refresh the cache instead of waiting for the next tick.
         self.replay_tick();
 
         Ok(())

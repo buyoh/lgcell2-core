@@ -3,7 +3,7 @@
 `WireSimState`（遅延ワイヤ・入力なしセルのスロット管理）を廃止し、全セルの前 tick 値を `Vec<bool>` で保持するシンプルな Cell ベースモデルに再実装する。
 
 作成日: 2026-04-08
-ステータス: 設計完了（未実装）
+ステータス: 完了
 
 ## 背景・動機
 
@@ -60,9 +60,12 @@ pub struct Simulator {
 遅延ワイヤの参照と入力なしセルの処理を変更。OR 合成・短絡評価のロジックは変更なし。
 
 ```rust
-// 入力なしセル: WireSimState のスロット参照 → prev_cell_values の直接参照
+// 入力なしセル: prev_cell_values から値を引き継ぐ（入力対象セルは除く）
 if incoming.is_empty() {
-    self.cell_values[cell_idx] = self.prev_cell_values[cell_idx];
+    if !self.circuit.inputs().iter().any(|i| i.target() == cell) {
+        self.cell_values[cell_idx] = self.prev_cell_values[cell_idx];
+    }
+    // 入力対象セルは apply_inputs() で設定済み
 }
 
 // 遅延ワイヤ: WireSimState のスロット参照 → prev_cell_values の直接参照
