@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use crate::base::CircuitError;
-use crate::circuit::{Circuit, Input, Output, Pos, Wire, WireKind};
+use crate::circuit::{Circuit, Input, Output, Pos, ResolvedModule, Wire, WireKind};
 
 /// ワイヤの追加時にセルを自動推論するビルダー。
 ///
@@ -12,6 +12,7 @@ pub struct CircuitBuilder {
     wires: Vec<Wire>,
     inputs: Vec<Input>,
     outputs: Vec<Output>,
+    modules: Vec<ResolvedModule>,
 }
 
 impl CircuitBuilder {
@@ -22,6 +23,7 @@ impl CircuitBuilder {
             wires: Vec::new(),
             inputs: Vec::new(),
             outputs: Vec::new(),
+            modules: Vec::new(),
         }
     }
 
@@ -45,9 +47,19 @@ impl CircuitBuilder {
         self
     }
 
+    /// モジュールインスタンスを追加する。
+    pub fn add_module(&mut self, module: ResolvedModule) -> &mut Self {
+        self.modules.push(module);
+        self
+    }
+
     /// 回路を構築する。
     pub fn build(self) -> Result<Circuit, CircuitError> {
-        Circuit::with_components(self.cells, self.wires, self.inputs, self.outputs)
+        if self.modules.is_empty() {
+            Circuit::with_components(self.cells, self.wires, self.inputs, self.outputs)
+        } else {
+            Circuit::with_modules(self.cells, self.wires, self.inputs, self.outputs, self.modules)
+        }
     }
 }
 

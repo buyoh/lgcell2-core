@@ -7,6 +7,11 @@ fn output_cell(sim: &SimulatorSimple, pos: crate::circuit::Pos) -> Option<bool> 
     sim.last_output().cells.get(&pos).copied()
 }
 
+fn sim_cell_at(sim: &mut SimulatorSimple, pos: crate::circuit::Pos, ticks: u64) -> bool {
+    sim.run(ticks);
+    output_cell(sim, pos).unwrap_or(false)
+}
+
 #[test]
 fn parse_valid_json_to_circuit() {
     let input = r#"
@@ -243,4 +248,347 @@ fn parse_pattern_returns_error_for_first_invalid_char() {
         err,
         crate::base::FormatError::InvalidPatternChar('z')
     ));
+}
+
+// --- Sub-circuit JSON parsing tests ---
+
+#[test]
+fn parse_sub_circuit_single_module() {
+    // NOT ゲートをサブ回路として定義し、モジュールとして使用
+    let input = r#"
+    {
+      "wires": [],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "inverter",
+          "input": [ [0, 0] ],
+          "output": [ [1, 0] ]
+        }
+      ],
+      "subs": {
+        "inverter": {
+          "wires": [
+            { "src": [0, 0], "dst": [1, 0], "kind": "negative" }
+          ],
+          "sub_input": [ [0, 0] ],
+          "sub_output": [ [1, 0] ]
+        }
+      }
+    }
+    "#;
+
+    let circuit = parse_circuit_json(input).expect("json must parse");
+    assert_eq!(circuit.modules().len(), 1);
+}
+
+#[test]
+fn parse_sub_circuit_simulation_inverter() {
+    // 入力 false → NOT → true
+    let input = r#"
+    {
+      "wires": [],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "inverter",
+          "input": [ [0, 0] ],
+          "output": [ [1, 0] ]
+        }
+      ],
+      "subs": {
+        "inverter": {
+          "wires": [
+            { "src": [0, 0], "dst": [1, 0], "kind": "negative" }
+          ],
+          "sub_input": [ [0, 0] ],
+          "sub_output": [ [1, 0] ]
+        }
+      }
+    }
+    "#;
+
+    let circuit = parse_circuit_json(input).expect("json must parse");
+    let mut sim = SimulatorSimple::new(circuit);
+    sim.tick();
+
+    // 入力 (0,0) = false → NOT → 出力 (1,0) = true
+    assert_eq!(output_cell(&sim, crate::circuit::Pos::new(1, 0)), Some(true));
+}
+
+#[test]
+fn parse_sub_circuit_half_adder() {
+    let input = r#"
+    {
+      "wires": [
+        { "src": [0, 0], "dst": [1, 0], "kind": "negative" },
+        { "src": [0, 0], "dst": [1, 1], "kind": "negative" }
+      ],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "half_adder",
+          "input": [ [1, 0], [1, 1] ],
+          "output": [ [2, 0], [2, 1] ]
+        }
+      ],
+      "subs": {
+        "half_adder": {
+          "wires": [
+            { "src": [0, 0], "dst": [1, 0], "kind": "positive" },
+            { "src": [0, 1], "dst": [1, 0], "kind": "positive" },
+            { "src": [0, 0], "dst": [1, 1], "kind": "negative" },
+            { "src": [0, 1], "dst": [1, 1], "kind": "negative" },
+            { "src": [1, 0], "dst": [2, 0], "kind": "negative" },
+            { "src": [1, 1], "dst": [2, 0], "kind": "negative" },
+            { "src": [2, 0], "dst": [3, 0], "kind": "negative" },
+            { "src": [0, 0], "dst": [2, 1], "kind": "negative" },
+            { "src": [0, 1], "dst": [2, 1], "kind": "negative" },
+            { "src": [2, 1], "dst": [3, 1], "kind": "negative" }
+          ],
+          "sub_input": [ [0, 0], [0, 1] ],
+          "sub_output": [ [3, 0], [3, 1] ]
+        }
+      }
+    }
+    "#;
+
+    let circuit = parse_circuit_json(input).expect("json must parse");
+    assert_eq!(circuit.modules().len(), 1);
+}
+
+#[test]
+fn parse_sub_circuit_nested_modules() {
+    // full_adder uses half_adder
+    let input = r#"
+    {
+      "wires": [],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "full_adder",
+          "input": [ [0, 0], [0, 1], [0, 2] ],
+          "output": [ [5, 0], [5, 1] ]
+        }
+      ],
+      "subs": {
+        "half_adder": {
+          "wires": [
+            { "src": [0, 0], "dst": [1, 0], "kind": "positive" },
+            { "src": [0, 1], "dst": [1, 0], "kind": "positive" },
+            { "src": [0, 0], "dst": [1, 1], "kind": "negative" },
+            { "src": [0, 1], "dst": [1, 1], "kind": "negative" },
+            { "src": [1, 0], "dst": [2, 0], "kind": "negative" },
+            { "src": [1, 1], "dst": [2, 0], "kind": "negative" },
+            { "src": [2, 0], "dst": [3, 0], "kind": "negative" },
+            { "src": [0, 0], "dst": [2, 1], "kind": "negative" },
+            { "src": [0, 1], "dst": [2, 1], "kind": "negative" },
+            { "src": [2, 1], "dst": [3, 1], "kind": "negative" }
+          ],
+          "sub_input": [ [0, 0], [0, 1] ],
+          "sub_output": [ [3, 0], [3, 1] ]
+        },
+        "full_adder": {
+          "wires": [
+            { "src": [3, 0], "dst": [4, 0], "kind": "positive" },
+            { "src": [0, 2], "dst": [4, 1], "kind": "positive" },
+            { "src": [3, 1], "dst": [8, 1], "kind": "positive" },
+            { "src": [7, 1], "dst": [8, 1], "kind": "positive" }
+          ],
+          "sub_input": [ [0, 0], [0, 1], [0, 2] ],
+          "sub_output": [ [8, 0], [8, 1] ],
+          "modules": [
+            {
+              "type": "sub",
+              "sub_circuit": "half_adder",
+              "input": [ [0, 0], [0, 1] ],
+              "output": [ [3, 0], [3, 1] ]
+            },
+            {
+              "type": "sub",
+              "sub_circuit": "half_adder",
+              "input": [ [4, 0], [4, 1] ],
+              "output": [ [7, 0], [7, 1] ]
+            }
+          ]
+        }
+      }
+    }
+    "#;
+
+    let circuit = parse_circuit_json(input).expect("json must parse");
+    assert_eq!(circuit.modules().len(), 1);
+    // The single module (full_adder) should itself contain nested modules
+    assert_eq!(circuit.modules()[0].circuit().modules().len(), 2);
+}
+
+#[test]
+fn parse_sub_circuit_rejects_missing_sub() {
+    let input = r#"
+    {
+      "wires": [],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "nonexistent",
+          "input": [ [0, 0] ],
+          "output": [ [1, 0] ]
+        }
+      ],
+      "subs": {}
+    }
+    "#;
+
+    let err = parse_circuit_json(input).expect_err("must reject missing sub-circuit");
+    assert!(matches!(err, crate::base::ParseError::SubCircuitNotFound(ref name) if name == "nonexistent"));
+}
+
+#[test]
+fn parse_sub_circuit_rejects_circular_dependency() {
+    let input = r#"
+    {
+      "wires": [],
+      "modules": [],
+      "subs": {
+        "a": {
+          "wires": [],
+          "sub_input": [ [0, 0] ],
+          "sub_output": [ [1, 0] ],
+          "modules": [
+            { "type": "sub", "sub_circuit": "b", "input": [ [0, 0] ], "output": [ [1, 0] ] }
+          ]
+        },
+        "b": {
+          "wires": [],
+          "sub_input": [ [0, 0] ],
+          "sub_output": [ [1, 0] ],
+          "modules": [
+            { "type": "sub", "sub_circuit": "a", "input": [ [0, 0] ], "output": [ [1, 0] ] }
+          ]
+        }
+      }
+    }
+    "#;
+
+    let err = parse_circuit_json(input).expect_err("must reject circular dependency");
+    assert!(matches!(err, crate::base::ParseError::CircularDependency(_)));
+}
+
+#[test]
+fn parse_sub_circuit_rejects_input_count_mismatch() {
+    let input = r#"
+    {
+      "wires": [],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "inv",
+          "input": [ [0, 0], [0, 1] ],
+          "output": [ [1, 0] ]
+        }
+      ],
+      "subs": {
+        "inv": {
+          "wires": [
+            { "src": [0, 0], "dst": [1, 0], "kind": "negative" }
+          ],
+          "sub_input": [ [0, 0] ],
+          "sub_output": [ [1, 0] ]
+        }
+      }
+    }
+    "#;
+
+    let err = parse_circuit_json(input).expect_err("must reject input count mismatch");
+    assert!(matches!(
+        err,
+        crate::base::ParseError::Circuit(crate::base::CircuitError::SubInputCountMismatch {
+            expected: 1,
+            actual: 2
+        })
+    ));
+}
+
+#[test]
+fn parse_sub_circuit_rejects_output_count_mismatch() {
+    let input = r#"
+    {
+      "wires": [],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "inv",
+          "input": [ [0, 0] ],
+          "output": [ [1, 0], [1, 1] ]
+        }
+      ],
+      "subs": {
+        "inv": {
+          "wires": [
+            { "src": [0, 0], "dst": [1, 0], "kind": "negative" }
+          ],
+          "sub_input": [ [0, 0] ],
+          "sub_output": [ [1, 0] ]
+        }
+      }
+    }
+    "#;
+
+    let err = parse_circuit_json(input).expect_err("must reject output count mismatch");
+    assert!(matches!(
+        err,
+        crate::base::ParseError::Circuit(crate::base::CircuitError::SubOutputCountMismatch {
+            expected: 1,
+            actual: 2
+        })
+    ));
+}
+
+#[test]
+fn parse_sub_circuit_rejects_sub_input_with_incoming_wire() {
+    let input = r#"
+    {
+      "wires": [],
+      "modules": [
+        {
+          "type": "sub",
+          "sub_circuit": "bad",
+          "input": [ [0, 0] ],
+          "output": [ [1, 0] ]
+        }
+      ],
+      "subs": {
+        "bad": {
+          "wires": [
+            { "src": [1, 0], "dst": [0, 0], "kind": "positive" }
+          ],
+          "sub_input": [ [0, 0] ],
+          "sub_output": [ [1, 0] ]
+        }
+      }
+    }
+    "#;
+
+    let err = parse_circuit_json(input).expect_err("must reject sub_input with incoming wire");
+    assert!(matches!(
+        err,
+        crate::base::ParseError::Circuit(crate::base::CircuitError::SubInputHasIncomingWires(_))
+    ));
+}
+
+#[test]
+fn parse_sub_circuit_backward_compatible_without_subs() {
+    let input = r#"
+    {
+      "wires": [
+        { "src": [0, 0], "dst": [1, 0], "kind": "negative" }
+      ]
+    }
+    "#;
+
+    let circuit = parse_circuit_json(input).expect("json must parse");
+    assert!(circuit.modules().is_empty());
+    let mut sim = SimulatorSimple::new(circuit);
+    sim.tick();
+    assert_eq!(output_cell(&sim, crate::circuit::Pos::new(1, 0)), Some(true));
 }

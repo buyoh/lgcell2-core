@@ -23,31 +23,42 @@
 3. ✅ モジュール出力セルの検証ロジック（入力ワイヤ禁止、重複禁止、ポート列制約）
 4. ✅ 既存テストが通ることを確認（`modules` が空の場合に既存動作が変わらない）
 
-## ステップ 3: JSON パース（サブ回路解決）
+## ステップ 3: JSON パース（サブ回路解決） ✅
 
 ### 対象ファイル
-- `src/io/json.rs`: `SubCircuitJson`, `ModuleJson`, `CircuitJson` 拡張、解決ロジック
+- `src/parser/json.rs`: `SubCircuitJson`, `ModuleJson`, `CircuitJson` 拡張、解決ロジック
+- `src/parser/json_tests.rs`: サブ回路パースのテスト
+- `src/circuit/builder.rs`: `modules` フィールドと `add_module()` 追加
+- `src/circuit/circuit.rs`: `validate_port_column_public()` 追加
 
 ### 作業内容
-1. `SubCircuitJson`, `ModuleJson` 構造体を追加
-2. `CircuitJson` に `modules`, `sub_circuits` フィールドを追加
-3. 循環依存検出（トポロジカルソート）の実装
-4. サブ回路定義の再帰的な `Circuit` 構築
-5. `ModuleJson` → `ResolvedModule` 変換（カウント検証含む）
-6. `TryFrom<CircuitJson> for Circuit` の更新
+1. ✅ `SubCircuitJson`, `ModuleJson` 構造体を追加
+2. ✅ `CircuitJson` に `modules`, `subs` フィールドを追加
+3. ✅ 循環依存検出（トポロジカルソート / Kahn's algorithm）の実装
+4. ✅ サブ回路定義の再帰的な `Circuit` 構築（`build_sub_circuit`, `resolve_module`）
+5. ✅ `ModuleJson` → `ResolvedModule` 変換（カウント検証含む）
+6. ✅ `TryFrom<CircuitJson> for Circuit` の更新
+7. ✅ テスト 10 件追加（正常系: 単一モジュール, シミュレーション付きインバータ, 半加算器, ネストモジュール, 後方互換性 / 異常系: サブ回路未定義, 循環依存, 入出力カウント不一致, sub_input 入力ワイヤ禁止）
 
-## ステップ 4: シミュレーションエンジンの変更
+### 修正した不具合
+- トポロジカルソートで同じサブ回路を複数回参照すると依存カウントが重複し、`CircularDependency` の誤検出が発生 → 依存リストの重複排除で修正
+
+## ステップ 4: シミュレーションエンジンの変更 ✅
 
 ### 対象ファイル
-- `src/simulation/engine.rs`: `Simulator` の拡張
+- `src/simulation/engine_simple.rs`: `SimulatorSimple` の拡張
+- `src/simulation/engine_tests.rs`: モジュール付きシミュレーションテスト
 
 ### 作業内容
-1. `sub_simulators: Vec<Simulator>` フィールド追加
-2. `module_output_cells: HashSet<usize>`, `module_triggers: HashMap<usize, usize>` の事前計算
-3. `step()` メソッドの修正（トリガーチェック + 出力セルスキップ）
-4. `evaluate_module()` の実装（`set_cell()` で入力注入、`tick()` で実行、`get_cell()` で出力取得）
-5. `Simulator::new()` / `with_output_format()` での子 Simulator 再帰構築
-6. `WireSimState` との相互作用の確認（sub_input セルが入力なしセルスロットとして扱われることの検証）
+1. ✅ `sub_simulators: Vec<SimulatorSimple>` フィールド追加
+2. ✅ `module_output_cells: HashSet<usize>`, `module_triggers: HashMap<usize, usize>` の事前計算
+3. ✅ `step()` メソッドの修正（トリガーチェック + 出力セルスキップ）
+4. ✅ `evaluate_module()` の実装（`cell_values`/`prev_cell_values` で入力注入、`tick()` で実行、出力値を親に反映）
+5. ✅ `with_output_format()` での子 `SimulatorSimple` 再帰構築
+6. ✅ テスト 6 件追加（インバータ false→true / true→false, 出力が後続セルに伝搬, ジェネレータ入力, 2モジュール共有入力, 空モジュール後方互換性）
+
+### 修正した不具合
+- モジュール出力セルが `Circuit::with_components()` のワイヤ・エンドポイント検証前に `cells` に含まれていなかったため `WireSrcNotFound` が発生 → `with_modules()` でセル挿入を先に行うよう修正
 
 ## ステップ 5: WASM API の対応
 

@@ -33,12 +33,23 @@ impl Circuit {
 
     /// セル定義、ワイヤ定義、Input/Output コンポーネント定義、モジュール定義から回路を構築する。
     pub fn with_modules(
-        cells: BTreeSet<Pos>,
+        mut cells: BTreeSet<Pos>,
         wires: Vec<Wire>,
         inputs: Vec<Input>,
         outputs: Vec<Output>,
         modules: Vec<ResolvedModule>,
     ) -> Result<Self, CircuitError> {
+        // モジュールの入出力セルを先に cells に追加
+        // （ワイヤの端点として参照される可能性があるため）
+        for module in &modules {
+            for &pos in module.output() {
+                cells.insert(pos);
+            }
+            for &pos in module.input() {
+                cells.insert(pos);
+            }
+        }
+
         let mut circuit = Self::with_components(cells, wires, inputs, outputs)?;
 
         // モジュール検証
@@ -86,17 +97,6 @@ impl Circuit {
                 }
             }
         }
-
-        // 出力セルを cells に追加
-        for module in &modules {
-            for &pos in module.output() {
-                circuit.cells.insert(pos);
-            }
-            for &pos in module.input() {
-                circuit.cells.insert(pos);
-            }
-        }
-        circuit.sorted_cells = circuit.cells.iter().copied().collect();
 
         circuit.modules = modules;
         Ok(circuit)
@@ -242,7 +242,7 @@ impl Circuit {
         self.incoming.get(&dst).map(Vec::as_slice).unwrap_or(&[])
     }
 
-    /// ポート列制約を検証する。
+    /// ポート列制約を検証する（内部用）。
     /// 全ポートが同一 x 座標で、y 座標が連続であることをチェック。
     fn validate_port_column(ports: &[Pos]) -> Result<(), CircuitError> {
         if ports.is_empty() {
@@ -258,6 +258,11 @@ impl Circuit {
             }
         }
         Ok(())
+    }
+
+    /// ポート列制約を検証する（パーサーからのサブ回路検証用）。
+    pub fn validate_port_column_public(ports: &[Pos]) -> Result<(), CircuitError> {
+        Self::validate_port_column(ports)
     }
 }
 

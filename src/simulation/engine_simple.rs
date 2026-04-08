@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::base::SimulationError;
 use crate::circuit::{Circuit, InputComponent, Output, Pos};
@@ -24,6 +24,12 @@ pub struct SimulatorSimple {
     cell_index: usize,
     last_output: TickOutput,
     output_format: OutputFormat,
+    /// モジュールごとの子 Simulator。
+    sub_simulators: Vec<SimulatorSimple>,
+    /// モジュール出力セルのインデックス集合。step() で通常処理をスキップする。
+    module_output_cells: HashSet<usize>,
+    /// 最初の出力セルインデックス → モジュールインデックス。サブ回路評価のトリガー。
+    module_triggers: HashMap<usize, usize>,
 }
 
 impl SimulatorSimple {
@@ -62,6 +68,31 @@ impl SimulatorSimple {
             },
         };
 
+        // モジュール関連の事前計算
+        let mut sub_simulators = Vec::new();
+        let mut module_output_cells = HashSet::new();
+        let mut module_triggers = HashMap::new();
+
+        for (module_idx, module) in circuit.modules().iter().enumerate() {
+            sub_simulators.push(SimulatorSimple::new(module.circuit().clone()));
+
+            // 出力セルのインデックスを登録
+            let mut first_output_idx: Option<usize> = None;
+            for &pos in module.output() {
+                if let Some(&idx) = cell_pos_to_index.get(&pos) {
+                    module_output_cells.insert(idx);
+                    if first_output_idx.is_none() || idx < first_output_idx.unwrap() {
+                        first_output_idx = Some(idx);
+                    }
+                }
+            }
+
+            // 最初の出力セル → モジュールインデックスのトリガー
+            if let Some(trigger_idx) = first_output_idx {
+                module_triggers.insert(trigger_idx, module_idx);
+            }
+        }
+
         Self {
             circuit,
             prev_cell_values: vec![false; cell_count],
@@ -71,6 +102,9 @@ impl SimulatorSimple {
             cell_index: 0,
             last_output,
             output_format,
+            sub_simulators,
+            module_output_cells,
+            module_triggers,
         }
     }
 
@@ -92,6 +126,41 @@ impl SimulatorSimple {
         self.last_output = self.build_output();
         self.cell_index = 0;
         self.tick += 1;
+    }
+
+    /// モジュールを評価し、親の cell_values に出力値を反映する。
+    fn evaluate_module(&mut self, module_index: usize) {
+        let module = &self.circuit.modules()[module_index];
+
+        // 1. 親の入力値をサブ回路に注入
+        for i in 0..module.input().len() {
+            let parent_idx = self.cell_pos_to_index[&module.input()[i]];
+            let parent_value = self.cell_values[parent_idx];
+            let sub_pos = module.sub_input()[i];
+            // set_cell は cell_values と prev_cell_values の両方を更新
+            let sub_sim = &mut self.sub_simulators[module_index];
+            if let Some(&sub_idx) = sub_sim.cell_pos_to_index.get(&sub_pos) {
+                sub_sim.cell_values[sub_idx] = parent_value;
+                sub_sim.prev_cell_values[sub_idx] = parent_value;
+            }
+        }
+
+        // 2. サブ回路を 1 tick 実行
+        self.sub_simulators[module_index].tick();
+
+        // 3. サブ回路の出力値を親に反映
+        let module = &self.circuit.modules()[module_index];
+        for j in 0..module.output().len() {
+            let sub_pos = module.sub_output()[j];
+            let sub_sim = &self.sub_simulators[module_index];
+            let sub_value = if let Some(&sub_idx) = sub_sim.cell_pos_to_index.get(&sub_pos) {
+                sub_sim.cell_values[sub_idx]
+            } else {
+                false
+            };
+            let parent_idx = self.cell_pos_to_index[&module.output()[j]];
+            self.cell_values[parent_idx] = sub_value;
+        }
     }
 
     fn build_output(&self) -> TickOutput {
@@ -128,32 +197,42 @@ impl Simulator for SimulatorSimple {
 
         let cell_idx = self.cell_index;
         let cell = self.circuit.sorted_cells()[cell_idx];
-        let incoming = self.circuit.incoming_indices(cell);
 
-        if incoming.is_empty() {
-            // 入力コンポーネント対象セルは apply_inputs() で既に値が設定されている。
-            // それ以外の入力なしセルのみ前 tick の値を引き継ぐ。
-            if !self.circuit.inputs().iter().any(|i| i.target() == cell) {
-                self.cell_values[cell_idx] = self.prev_cell_values[cell_idx];
-            }
+        // 1. モジュール評価トリガーチェック
+        if let Some(&module_index) = self.module_triggers.get(&cell_idx) {
+            self.evaluate_module(module_index);
+        }
+
+        // 2. セル値の計算
+        if self.module_output_cells.contains(&cell_idx) {
+            // モジュール出力セル: evaluate_module で設定済み。何もしない。
         } else {
-            let mut next_value = false;
-            for &wire_index in incoming {
-                let wire = &self.circuit.wires()[wire_index];
-                let src_value = if wire.dst < wire.src {
-                    let src_idx = self.cell_pos_to_index[&wire.src];
-                    self.prev_cell_values[src_idx]
-                } else {
-                    let src_idx = self.cell_pos_to_index[&wire.src];
-                    self.cell_values[src_idx]
-                };
-
-                next_value = next_value || wire.propagate(src_value);
-                if next_value {
-                    break;
+            let incoming = self.circuit.incoming_indices(cell);
+            if incoming.is_empty() {
+                // 入力コンポーネント対象セルは apply_inputs() で既に値が設定されている。
+                // それ以外の入力なしセルのみ前 tick の値を引き継ぐ。
+                if !self.circuit.inputs().iter().any(|i| i.target() == cell) {
+                    self.cell_values[cell_idx] = self.prev_cell_values[cell_idx];
                 }
+            } else {
+                let mut next_value = false;
+                for &wire_index in incoming {
+                    let wire = &self.circuit.wires()[wire_index];
+                    let src_value = if wire.dst < wire.src {
+                        let src_idx = self.cell_pos_to_index[&wire.src];
+                        self.prev_cell_values[src_idx]
+                    } else {
+                        let src_idx = self.cell_pos_to_index[&wire.src];
+                        self.cell_values[src_idx]
+                    };
+
+                    next_value = next_value || wire.propagate(src_value);
+                    if next_value {
+                        break;
+                    }
+                }
+                self.cell_values[cell_idx] = next_value;
             }
-            self.cell_values[cell_idx] = next_value;
         }
 
         self.cell_index += 1;

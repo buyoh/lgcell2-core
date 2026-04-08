@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::collections::{BTreeSet, HashMap};
 
-use crate::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire, WireKind};
+use crate::circuit::{Circuit, Generator, Input, Output, Pos, ResolvedModule, Tester, Wire, WireKind};
 use crate::simulation::{OutputFormat, Rect, Simulator, SimulatorSimple, StepResult};
 
 fn output_cell(sim: &SimulatorSimple, pos: Pos) -> Option<bool> {
@@ -442,4 +442,163 @@ fn run_with_snapshots_uses_last_output_cache_per_tick() {
     assert_eq!(snapshots[1].tick, 1);
     assert_eq!(snapshots[2].tick, 2);
     assert_eq!(sim.last_output_calls.get(), 3);
+}
+
+// --- Module simulation tests ---
+
+fn make_inverter_sub_circuit() -> Circuit {
+    let cells = BTreeSet::from([Pos::new(0, 0), Pos::new(1, 0)]);
+    let wires = vec![Wire::new(Pos::new(0, 0), Pos::new(1, 0), WireKind::Negative)];
+    Circuit::new(cells, wires).expect("valid sub-circuit")
+}
+
+fn make_inverter_module(input_pos: Pos, output_pos: Pos) -> ResolvedModule {
+    ResolvedModule::new(
+        make_inverter_sub_circuit(),
+        vec![input_pos],
+        vec![output_pos],
+        vec![Pos::new(0, 0)],
+        vec![Pos::new(1, 0)],
+    )
+}
+
+#[test]
+fn module_inverter_false_to_true() {
+    // (0,0) → module[inv] → (1,0)
+    // 入力 false → NOT → 出力 true
+    let module = make_inverter_module(Pos::new(0, 0), Pos::new(1, 0));
+    let circuit = Circuit::with_modules(
+        BTreeSet::from([Pos::new(0, 0)]),
+        vec![],
+        Vec::new(),
+        Vec::new(),
+        vec![module],
+    )
+    .expect("valid circuit");
+
+    let mut sim = SimulatorSimple::new(circuit);
+    sim.tick();
+
+    assert_eq!(output_cell(&sim, Pos::new(0, 0)), Some(false));
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(true));
+}
+
+#[test]
+fn module_inverter_true_to_false() {
+    // set_cell で入力を true にして tick
+    let module = make_inverter_module(Pos::new(0, 0), Pos::new(1, 0));
+    let circuit = Circuit::with_modules(
+        BTreeSet::from([Pos::new(0, 0)]),
+        vec![],
+        Vec::new(),
+        Vec::new(),
+        vec![module],
+    )
+    .expect("valid circuit");
+
+    let mut sim = SimulatorSimple::new(circuit);
+    sim.set_cell(Pos::new(0, 0), true).expect("set_cell must succeed");
+    sim.tick();
+
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(false));
+}
+
+#[test]
+fn module_output_feeds_subsequent_cells() {
+    // (0,0) → module[inv] → (1,0) → [negative wire] → (2,0)
+    // false → NOT → true → NOT → false
+    let module = make_inverter_module(Pos::new(0, 0), Pos::new(1, 0));
+    let circuit = Circuit::with_modules(
+        BTreeSet::from([Pos::new(0, 0), Pos::new(2, 0)]),
+        vec![Wire::new(Pos::new(1, 0), Pos::new(2, 0), WireKind::Negative)],
+        Vec::new(),
+        Vec::new(),
+        vec![module],
+    )
+    .expect("valid circuit");
+
+    let mut sim = SimulatorSimple::new(circuit);
+    sim.tick();
+
+    // (0,0)=false → inv → (1,0)=true → neg → (2,0)=false
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(true));
+    assert_eq!(output_cell(&sim, Pos::new(2, 0)), Some(false));
+}
+
+#[test]
+fn module_with_generator_input() {
+    // Generator: (0,0) = [true, false] loop
+    // Module: (0,0) → inv → (1,0)
+    let module = make_inverter_module(Pos::new(0, 0), Pos::new(1, 0));
+    let circuit = Circuit::with_modules(
+        BTreeSet::new(),
+        vec![],
+        vec![Input::Generator(Generator::new(
+            Pos::new(0, 0),
+            vec![true, false],
+            true,
+        ))],
+        Vec::new(),
+        vec![module],
+    )
+    .expect("valid circuit");
+
+    let mut sim = SimulatorSimple::new(circuit);
+
+    // tick 0: generator=true → inv → false
+    sim.tick();
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(false));
+
+    // tick 1: generator=false → inv → true
+    sim.tick();
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(true));
+}
+
+#[test]
+fn two_modules_sharing_same_input() {
+    // (0,0) → module_a[inv] → (1, 0)
+    // (0,0) → module_b[inv] → (1, 1)
+    let module_a = ResolvedModule::new(
+        make_inverter_sub_circuit(),
+        vec![Pos::new(0, 0)],
+        vec![Pos::new(1, 0)],
+        vec![Pos::new(0, 0)],
+        vec![Pos::new(1, 0)],
+    );
+    let module_b = ResolvedModule::new(
+        make_inverter_sub_circuit(),
+        vec![Pos::new(0, 0)],
+        vec![Pos::new(1, 1)],
+        vec![Pos::new(0, 0)],
+        vec![Pos::new(1, 0)],
+    );
+    let circuit = Circuit::with_modules(
+        BTreeSet::from([Pos::new(0, 0)]),
+        vec![],
+        Vec::new(),
+        Vec::new(),
+        vec![module_a, module_b],
+    )
+    .expect("valid circuit");
+
+    let mut sim = SimulatorSimple::new(circuit);
+    sim.tick();
+
+    // Both outputs should be true (NOT false = true)
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(true));
+    assert_eq!(output_cell(&sim, Pos::new(1, 1)), Some(true));
+}
+
+#[test]
+fn module_empty_modules_backward_compat() {
+    // No modules — should behave exactly the same
+    let circuit = make_circuit(
+        &[Pos::new(0, 0), Pos::new(1, 0)],
+        vec![Wire::new(Pos::new(0, 0), Pos::new(1, 0), WireKind::Negative)],
+    );
+
+    let mut sim = SimulatorSimple::new(circuit);
+    sim.tick();
+
+    assert_eq!(output_cell(&sim, Pos::new(1, 0)), Some(true));
 }
