@@ -102,3 +102,48 @@ JSON 入力では `cells` フィールドは存在せず、ワイヤの端点 (`
 ```
 
 この例では、セル `(0,0)` と `(1,0)` がワイヤ端点から自動的に推論・登録される。
+
+## サブ回路データモデル
+
+サブ回路導入後は、`Circuit` がモジュールインスタンス列を保持する。
+
+```rust
+pub struct Circuit {
+  cells: BTreeSet<Pos>,
+  wires: Vec<Wire>,
+  incoming: HashMap<Pos, Vec<usize>>,
+  sorted_cells: Vec<Pos>,
+  modules: Vec<ResolvedModule>,
+}
+```
+
+`ResolvedModule` は、モジュールインスタンスに必要な情報をすべて解決済みで保持する値オブジェクトである。
+
+```rust
+pub struct ResolvedModule {
+  sub_circuit: Circuit,
+  input: Vec<Pos>,
+  output: Vec<Pos>,
+  sub_input: Vec<Pos>,
+  sub_output: Vec<Pos>,
+}
+```
+
+### ResolvedModule の役割
+
+- `sub_circuit`: 子回路本体
+- `input`: 親回路上の入力ポート
+- `output`: 親回路上の出力ポート
+- `sub_input`: 子回路側の入力ポート
+- `sub_output`: 子回路側の出力ポート
+
+この 5 要素を 1 つに束ねることで、シミュレーション時に親子間の値転送（入力注入と出力反映）をインデックスベースで実行できる。
+
+### 構築時検証（モジュール関連）
+
+`Circuit::with_modules()` は既存のワイヤ検証に加え、以下を検証する。
+
+1. モジュール出力セルへの入力ワイヤ禁止
+2. モジュール出力セルの重複禁止
+3. ポート列制約（同一 x、連続 y）
+4. 出力列が入力列より後方（x が大きい）

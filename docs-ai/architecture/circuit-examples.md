@@ -177,3 +177,43 @@ XOR(a, b) = AND(OR(a,b), NAND(a,b))。5 セル構成。
 | AND / NOR | 4 |
 | XOR | 5〜6 |
 | 半加算器 | 8 |
+
+## サブ回路を使った再利用例
+
+## インバータをサブ回路化して利用
+
+```json
+{
+  "wires": [],
+  "modules": [
+    {
+      "type": "sub",
+      "sub_circuit": "inverter",
+      "input": [[2, 0]],
+      "output": [[3, 0]]
+    }
+  ],
+  "subs": {
+    "inverter": {
+      "wires": [
+        { "src": [0, 0], "dst": [1, 0], "kind": "negative" }
+      ],
+      "sub_input": [[0, 0]],
+      "sub_output": [[1, 0]],
+      "modules": []
+    }
+  }
+}
+```
+
+親回路セル `(2,0)` の値がサブ回路の `sub_input` に注入され、1 tick 評価後の `sub_output` が親回路 `(3,0)` に反映される。
+
+## 半加算器サブ回路を 2 つ使った全加算器（概念例）
+
+`half_adder` サブ回路を 2 インスタンス利用し、最後に carry を合成することで `full_adder` を構成できる。
+
+- インスタンス 1: `A, B -> S1, C1`
+- インスタンス 2: `S1, Cin -> Sum, C2`
+- 最終 carry: `C1 OR C2`
+
+このように、複合回路をサブ回路単位で分割すると、配線記述量を減らしつつ可読性を維持できる。

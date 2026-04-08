@@ -100,7 +100,7 @@
 
 ### 実施結果
 - ✅ 既存の Step1-4 テスト群に加えて、Step5-7 で WASM API / View モードのテストを追加
-- ✅ `cargo test`（default）: 147 tests passed
+- ✅ `cargo test`（default）: 148 tests passed
 - ✅ `cargo test --features wasm`: 165 tests passed（107 + 7 + 51）
 
 ### テストケース
@@ -129,10 +129,16 @@
 - View モードでサブ回路を含む回路を拒否
 - WASM API: 不正なサブ回路定義でのエラー
 
-## ステップ 8: ドキュメント更新
+## ステップ 8: ドキュメント更新 ✅
 
 ### 対象ファイル
 - `docs/spec/circuit-json.md`: JSON 仕様にサブ回路セクション追加
 - `docs-ai/architecture/data-model.md`: ResolvedModule の記述追加
 - `docs-ai/architecture/simulation-model.md`: 階層的シミュレーションの記述追加
 - `docs-ai/architecture/circuit-examples.md`: サブ回路を使った回路例の追加
+
+### 作業内容
+1. ✅ `docs/spec/circuit-json.md` に `modules` / `subs` スキーマ、制約、サンプル JSON を追加
+2. ✅ `docs-ai/architecture/data-model.md` に `ResolvedModule` と `Circuit.modules` のモデル記述を追加
+3. ✅ `docs-ai/architecture/simulation-model.md` に階層的シミュレーション（`sub_simulators`, `module_triggers`, `evaluate_module`）を追加
+4. ✅ `docs-ai/architecture/circuit-examples.md` にサブ回路再利用の回路例を追加
