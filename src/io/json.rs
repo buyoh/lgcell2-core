@@ -1,10 +1,10 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
 use crate::base::{FormatError, ParseError};
-use crate::circuit::{Circuit, CircuitBuilder, Generator, Input, Output, Pos, Tester, WireKind};
-use crate::simulation::{Simulator, SimulatorSimple};
+use crate::circuit::{Circuit, Generator, Input, Output, Pos, Tester, Wire, WireKind};
+use crate::simulation::Simulator;
 
 /// 回路 JSON 全体を表す入力モデル。
 #[derive(Debug, Deserialize)]
@@ -14,12 +14,6 @@ pub struct CircuitJson {
     pub input: Vec<InputJson>,
     #[serde(default)]
     pub output: Vec<OutputJson>,
-    /// deprecated: input に移行中。パーサーで併用を許可する。
-    #[serde(default)]
-    pub generators: Vec<GeneratorJson>,
-    /// deprecated: output に移行中。パーサーで併用を許可する。
-    #[serde(default)]
-    pub testers: Vec<TesterJson>,
 }
 
 /// ワイヤ入力を表す JSON モデル。
@@ -28,24 +22,6 @@ pub struct WireJson {
     pub src: [i32; 2],
     pub dst: [i32; 2],
     pub kind: String,
-}
-
-/// ジェネレーター入力を表す JSON モデル。
-#[derive(Debug, Deserialize)]
-pub struct GeneratorJson {
-    pub target: [i32; 2],
-    pub pattern: String,
-    #[serde(default, rename = "loop")]
-    pub is_loop: bool,
-}
-
-/// テスター入力を表す互換 JSON モデル。
-#[derive(Debug, Deserialize)]
-pub struct TesterJson {
-    pub target: [i32; 2],
-    pub expected: String,
-    #[serde(default, rename = "loop")]
-    pub is_loop: bool,
 }
 
 /// Input コンポーネント入力を表す JSON モデル。
@@ -89,15 +65,20 @@ impl TryFrom<CircuitJson> for Circuit {
     type Error = ParseError;
 
     fn try_from(value: CircuitJson) -> Result<Self, Self::Error> {
-        let mut builder = CircuitBuilder::new();
+        let mut cells = BTreeSet::new();
+        let mut wires = Vec::with_capacity(value.wires.len());
 
         for wire in value.wires {
             let src = Pos::new(wire.src[0], wire.src[1]);
             let dst = Pos::new(wire.dst[0], wire.dst[1]);
             let kind = parse_wire_kind(&wire.kind)?;
-            builder.add_wire(src, dst, kind);
+
+            cells.insert(src);
+            cells.insert(dst);
+            wires.push(Wire::new(src, dst, kind));
         }
 
+        let mut inputs = Vec::with_capacity(value.input.len());
         for input in value.input {
             match input {
                 InputJson::Generator {
@@ -107,21 +88,12 @@ impl TryFrom<CircuitJson> for Circuit {
                 } => {
                     let target = Pos::new(target[0], target[1]);
                     let pattern = parse_pattern(&pattern)?;
-                    builder.add_input(Input::Generator(Generator::new(target, pattern, is_loop)));
+                    inputs.push(Input::Generator(Generator::new(target, pattern, is_loop)));
                 }
             }
         }
 
-        for generator in value.generators {
-            let target = Pos::new(generator.target[0], generator.target[1]);
-            let pattern = parse_pattern(&generator.pattern)?;
-            builder.add_input(Input::Generator(Generator::new(
-                target,
-                pattern,
-                generator.is_loop,
-            )));
-        }
-
+        let mut outputs = Vec::with_capacity(value.output.len());
         for output in value.output {
             match output {
                 OutputJson::Tester {
@@ -131,18 +103,12 @@ impl TryFrom<CircuitJson> for Circuit {
                 } => {
                     let target = Pos::new(target[0], target[1]);
                     let expected = parse_expected_pattern(&expected)?;
-                    builder.add_output(Output::Tester(Tester::new(target, expected, is_loop)));
+                    outputs.push(Output::Tester(Tester::new(target, expected, is_loop)));
                 }
             }
         }
 
-        for tester in value.testers {
-            let target = Pos::new(tester.target[0], tester.target[1]);
-            let expected = parse_expected_pattern(&tester.expected)?;
-            builder.add_output(Output::Tester(Tester::new(target, expected, tester.is_loop)));
-        }
-
-        builder.build().map_err(ParseError::from)
+        Circuit::with_components(cells, wires, inputs, outputs).map_err(ParseError::from)
     }
 }
 
@@ -188,7 +154,7 @@ pub fn parse_circuit_json(input: &str) -> Result<Circuit, ParseError> {
 
 /// 回路を指定 tick だけ実行した結果を JSON モデルとして返す。
 pub fn simulate_to_output_json(circuit: Circuit, ticks: u64) -> SimulationOutputJson {
-    let mut simulator = SimulatorSimple::new(circuit);
+    let mut simulator = Simulator::new(circuit);
     let snapshots = simulator.run_with_snapshots(ticks);
     let mut results = Vec::with_capacity(snapshots.len());
 

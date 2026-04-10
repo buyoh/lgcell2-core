@@ -185,7 +185,7 @@ fn parse_rejects_invalid_generator_pattern_char() {
 }
 
 #[test]
-fn circuit_json_deserializes_without_generators() {
+fn circuit_json_deserializes_without_input() {
     let input = r#"
     {
       "wires": []
@@ -194,22 +194,40 @@ fn circuit_json_deserializes_without_generators() {
 
     let parsed: CircuitJson = serde_json::from_str(input).expect("must deserialize");
     assert!(parsed.input.is_empty());
-    assert!(parsed.generators.is_empty());
 }
 
 #[test]
-fn circuit_json_deserializes_legacy_generators_for_compatibility() {
+fn legacy_generators_field_is_silently_ignored() {
     let input = r#"
     {
-      "wires": [],
+      "wires": [
+        { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
+      ],
       "generators": [
-      { "target": [0, 0], "pattern": "10" }
+        { "target": [0, 0], "pattern": "10" }
       ]
     }
     "#;
 
-    let parsed: CircuitJson = serde_json::from_str(input).expect("must deserialize");
-    assert_eq!(parsed.generators.len(), 1);
+    let circuit = parse_circuit_json(input).expect("json must parse");
+    assert!(circuit.inputs().is_empty(), "legacy generators must be ignored");
+}
+
+#[test]
+fn legacy_testers_field_is_silently_ignored() {
+    let input = r#"
+    {
+      "wires": [
+        { "src": [0, 0], "dst": [1, 0], "kind": "positive" }
+      ],
+      "testers": [
+        { "target": [1, 0], "expected": "0" }
+      ]
+    }
+    "#;
+
+    let circuit = parse_circuit_json(input).expect("json must parse");
+    assert!(circuit.outputs().is_empty(), "legacy testers must be ignored");
 }
 
 #[test]

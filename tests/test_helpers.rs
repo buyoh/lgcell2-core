@@ -182,15 +182,6 @@ fn build_circuit_with_case_inputs(
         }
     }
 
-    for generator in &circuit_json.generators {
-        let target = Pos::new(generator.target[0], generator.target[1]);
-        let pattern = parse_pattern(&generator.pattern)?;
-        inputs_by_target.insert(
-            target,
-            Input::Generator(Generator::new(target, pattern, generator.is_loop)),
-        );
-    }
-
     for input in case_inputs {
         match input {
             InputCaseJson::Generator {
@@ -233,15 +224,6 @@ fn build_circuit_with_case_inputs(
                 );
             }
         }
-    }
-
-    for tester in &circuit_json.testers {
-        let target = Pos::new(tester.target[0], tester.target[1]);
-        let expected = parse_expected_pattern(&tester.expected)?;
-        outputs_by_target.insert(
-            target,
-            Output::Tester(Tester::new(target, expected, tester.is_loop)),
-        );
     }
 
     for output in case_outputs {

@@ -23,8 +23,6 @@
 | `input` | `Input[]` | いいえ | 入力コンポーネント定義（generator） |
 | `output` | `Output[]` | いいえ | 出力コンポーネント定義（tester） |
 
-注: `generators` / `testers` は後方互換用として引き続き受理されます。
-
 ### Wire オブジェクト
 
 | フィールド | 型 | 必須 | 説明 |

@@ -16,12 +16,6 @@ pub struct CircuitJson {
     pub input: Vec<InputJson>,
     #[serde(default)]
     pub output: Vec<OutputJson>,
-    /// deprecated: input に移行中。パーサーで併用を許可する。
-    #[serde(default)]
-    pub generators: Vec<GeneratorJson>,
-    /// deprecated: output に移行中。パーサーで併用を許可する。
-    #[serde(default)]
-    pub testers: Vec<TesterJson>,
     #[serde(default)]
     pub modules: Vec<ModuleJson>,
     #[serde(default)]
@@ -54,24 +48,6 @@ pub struct WireJson {
     pub src: [i32; 2],
     pub dst: [i32; 2],
     pub kind: String,
-}
-
-/// ジェネレーター入力を表す JSON モデル。
-#[derive(Debug, Deserialize)]
-pub struct GeneratorJson {
-    pub target: [i32; 2],
-    pub pattern: String,
-    #[serde(default, rename = "loop")]
-    pub is_loop: bool,
-}
-
-/// テスター入力を表す互換 JSON モデル。
-#[derive(Debug, Deserialize)]
-pub struct TesterJson {
-    pub target: [i32; 2],
-    pub expected: String,
-    #[serde(default, rename = "loop")]
-    pub is_loop: bool,
 }
 
 /// Input コンポーネント入力を表す JSON モデル。
@@ -141,16 +117,6 @@ impl TryFrom<CircuitJson> for Circuit {
             }
         }
 
-        for generator in value.generators {
-            let target = Pos::new(generator.target[0], generator.target[1]);
-            let pattern = parse_pattern(&generator.pattern)?;
-            builder.add_input(Input::Generator(Generator::new(
-                target,
-                pattern,
-                generator.is_loop,
-            )));
-        }
-
         for output in value.output {
             match output {
                 OutputJson::Tester {
@@ -163,12 +129,6 @@ impl TryFrom<CircuitJson> for Circuit {
                     builder.add_output(Output::Tester(Tester::new(target, expected, is_loop)));
                 }
             }
-        }
-
-        for tester in value.testers {
-            let target = Pos::new(tester.target[0], tester.target[1]);
-            let expected = parse_expected_pattern(&tester.expected)?;
-            builder.add_output(Output::Tester(Tester::new(target, expected, tester.is_loop)));
         }
 
         // モジュールの解決
